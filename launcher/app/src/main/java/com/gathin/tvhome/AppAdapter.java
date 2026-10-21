@@ -200,6 +200,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     /** Extras.iconPack: "stock" or "glass". */
     private final String iconPack;
+    /** Extras.rimIntensity: the tiles' glass rim, 0 to 100. */
+    private final int rimIntensity;
 
     AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg) {
         this.ctx = ctx;
@@ -215,6 +217,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.reducedMotion = cfg.reducedMotion;
         this.rowsBelowDock = cfg.rowsBelowDock;
         this.iconPack = Extras.iconPack(ctx);
+        this.rimIntensity = Extras.rimIntensity(ctx);
         this.dockTitle = cfg.dockTitle;
         this.dockRow = cfg.dockRow;
         this.cinematic = cfg.cinematicHome;
@@ -414,7 +417,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         // nothing on every frame; keep it under banners with transparent parts and under icon tiles.
         float density = ctx.getResources().getDisplayMetrics().density;
         // Every pack: the glass rim, bright where the light hits the top left and the bottom right.
-        ((android.widget.FrameLayout) h.card).setForeground(GlassIcons.rim(density));
+        ((android.widget.FrameLayout) h.card).setForeground(GlassIcons.rim(density, rimIntensity));
         boolean settingsApp = e.pkg != null && e.pkg.equals(GlassIcons.SETTINGS_PKG);
         Drawable logo = (iconPack.equals("glass") || settingsApp) && e.kind != Entry.HOME_SETTINGS
                 ? GlassIcons.logo(ctx.getResources(), e.component.flattenToShortString(), e.banner, e.icon) : null;
@@ -445,6 +448,11 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             h.label.setText(e.label);
             h.label.setVisibility(View.VISIBLE);
         }
+        // A see-through tile (glass logo, or a banner with transparent parts) shows its own lift shadow through itself,
+        // as a dark blot behind the logo: such tiles lift without a shadow.
+        boolean seeThrough = logo != null || (e.banner != null && e.banner.getOpacity() != PixelFormat.OPAQUE);
+        h.shadowless = seeThrough;
+        h.card.invalidateOutline();
         h.card.setOnClickListener(v -> launch(e));
         h.card.setOnLongClickListener(v -> {
             Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + e.pkg));
@@ -662,6 +670,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final boolean animations;
         final boolean advancedEffects;
         final boolean reducedMotion;
+        /** The tile is see-through (glass logo, transparent banner): lifted without a shadow. */
+        boolean shadowless;
 
         Holder(View v, TileListener listener, boolean animations, boolean advancedEffects,
                boolean reducedMotion) {
@@ -682,6 +692,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 public void getOutline(View view, Outline outline) {
                     // 16dp at the design width, scaled down with the tile so small tiles keep the same shape.
                     outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), cornerRadius(view.getWidth(), density));
+                    // A see-through tile keeps its rounded clip but casts no shadow (it showed through the glass).
+                    outline.setAlpha(shadowless ? 0f : 1f);
                 }
             });
             card.setClipToOutline(true);

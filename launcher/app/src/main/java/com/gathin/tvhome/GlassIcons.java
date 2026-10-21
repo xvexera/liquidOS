@@ -231,8 +231,9 @@ final class GlassIcons {
     }
 
     /** The glass rim of every tile: bright at the top left, faint along the sides, a second light at the bottom right. */
-    static Drawable rim(float density) {
-        return new Rim(density);
+    /** {@code intensity} 0 to 100 (60 is the designed look); 0 gives no rim at all. */
+    static Drawable rim(float density, int intensity) {
+        return intensity <= 0 ? null : new Rim(density, intensity / 60f);
     }
 
     private static final class Base extends Drawable {
@@ -262,42 +263,75 @@ final class GlassIcons {
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 
+    /**
+     * The glass rim, scaled to the tile: its line is about 1.2% of the tile's width, so it reads the same at any column
+     * count. The light runs round it by angle (a sweep): strongest at the top left and bottom right corners, nearly
+     * gone at the other two, like light catching the edge of a glass slab. Inside it a blurred band (the thickness of
+     * the glass), outside it a hairline of shade so the rim still shows over a bright wallpaper.
+     */
     private static final class Rim extends Drawable {
         private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint inner = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint bevel = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint shade = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private final float density;
+        /** Strength: 1 is the designed look, up to about 1.7 at 100. */
+        private final float k;
 
-        Rim(float density) {
+        Rim(float density, float strength) {
             this.density = density;
+            this.k = strength;
             line.setStyle(Paint.Style.STROKE);
-            line.setStrokeWidth(1.6f * density);
-            inner.setStyle(Paint.Style.STROKE);
-            inner.setStrokeWidth(3f * density);
+            bevel.setStyle(Paint.Style.STROKE);
+            shade.setStyle(Paint.Style.STROKE);
+            shade.setColor(0x38000000);
         }
 
         @Override
         protected void onBoundsChange(Rect b) {
-            // Diagonal light: strongest top left, gone in the middle of each side, back softer at the bottom right.
-            line.setShader(new LinearGradient(b.left, b.top, b.right, b.bottom,
-                    new int[]{0xE6FFFFFF, 0x33FFFFFF, 0x14FFFFFF, 0x33FFFFFF, 0x99FFFFFF},
-                    new float[]{0f, 0.25f, 0.5f, 0.75f, 1f}, Shader.TileMode.CLAMP));
-            // A wider, softer band just inside the rim: the thickness of the glass catching the light.
-            inner.setShader(new LinearGradient(b.left, b.top, b.right, b.bottom,
-                    new int[]{0x40FFFFFF, 0x00FFFFFF, 0x00FFFFFF, 0x26FFFFFF},
-                    new float[]{0f, 0.3f, 0.7f, 1f}, Shader.TileMode.CLAMP));
+            float w = b.width(), h = b.height();
+            // Thicker as well as brighter as the strength goes up.
+            float t = Math.max(1.2f, w * 0.012f * (0.6f + 0.4f * k));
+            line.setStrokeWidth(t);
+            bevel.setStrokeWidth(t * 2.6f);
+            bevel.setMaskFilter(new android.graphics.BlurMaskFilter(t * 1.4f, android.graphics.BlurMaskFilter.Blur.NORMAL));
+            shade.setStrokeWidth(Math.max(1f, t * 0.45f));
+            // Corner angles of this rectangle (a wide tile's corners are not at 45 degrees), clockwise from 3 o'clock.
+            float a = (float) Math.toDegrees(Math.atan2(h, w)) / 360f;
+            float[] at = {0f, a, 0.5f - a, 0.5f + a, 1f - a, 1f};
+            int[] lit = {0x99FFFFFF, 0xF2FFFFFF, 0x1FFFFFFF, 0xFFFFFFFF, 0x2EFFFFFF, 0x99FFFFFF};
+            int[] soft = {0x26FFFFFF, 0x59FFFFFF, 0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF, 0x26FFFFFF};
+            line.setShader(new android.graphics.SweepGradient(b.exactCenterX(), b.exactCenterY(), scale(lit), at));
+            bevel.setShader(new android.graphics.SweepGradient(b.exactCenterX(), b.exactCenterY(), scale(soft), at));
+            shade.setColor(Math.min(255, Math.round(0x38 * Math.min(1.4f, k))) << 24);
+        }
+
+        /** The colours' alpha times the strength, capped at opaque. */
+        private int[] scale(int[] colours) {
+            int[] out = new int[colours.length];
+            for (int i = 0; i < colours.length; i++) {
+                int a = Math.min(255, Math.round((colours[i] >>> 24) * k));
+                out[i] = a << 24 | (colours[i] & 0xFFFFFF);
+            }
+            return out;
         }
 
         @Override
         public void draw(Canvas canvas) {
             float r = AppAdapter.cornerRadius(getBounds().width(), density);
-            float i = line.getStrokeWidth() / 2f;
+            float s = shade.getStrokeWidth() / 2f;
             rect.set(getBounds());
-            rect.inset(i, i);
-            canvas.drawRoundRect(rect, r - i, r - i, line);
-            float j = 2.2f * density;
-            rect.inset(j, j);
-            canvas.drawRoundRect(rect, Math.max(0, r - i - j), Math.max(0, r - i - j), inner);
+            rect.inset(s, s);
+            canvas.drawRoundRect(rect, r - s, r - s, shade);
+            float t = line.getStrokeWidth();
+            rect.set(getBounds());
+            rect.inset(s * 2 + t / 2f, s * 2 + t / 2f);
+            float lr = Math.max(0f, r - s * 2 - t / 2f);
+            canvas.drawRoundRect(rect, lr, lr, line);
+            float bi = bevel.getStrokeWidth() / 2f;
+            rect.inset(bi, bi);
+            float br = Math.max(0f, lr - bi);
+            canvas.drawRoundRect(rect, br, br, bevel);
         }
 
         @Override public void setAlpha(int alpha) { }

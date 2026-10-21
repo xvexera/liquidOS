@@ -95,8 +95,6 @@
     <string name="home_settings">Elegir la pantalla de inicio</string>
     <string name="wallpaper_tierra">Tierra desde la órbita</string>
     <string name="wallpaper_nebulosa">Nebulosa</string>
-    <string name="wallpaper_via_lactea">Vía Láctea</string>
-    <string name="wallpaper_luna">Luna</string>
     <string name="module_cards">Tarjetas de apps (módulos)</string>
     <string name="night_mode">Modo nocturno</string>
     <string name="night_needs_permission">Necesita el permiso de superposición, que se da una vez por adb: appops set com.gathin.tvhome SYSTEM_ALERT_WINDOW allow</string>
@@ -179,4 +177,8 @@
     <string name="clock_style_glass">Glass</string>
     <string name="clock_style_glass_thin">Glass fino</string>
     <string name="settings_blur_zero_note">Consejo: activa Efectos avanzados para una experiencia de vidrio completa.</string>
+    <string name="rim_intensity">Efecto vidrio en los bordes de iconos</string>
+    <string name="rim_intensity_hint">Cuánto brillan los bordes de las apps como vidrio; 0 lo desactiva.</string>
+    <string name="wallpaper_icon">Fondo por icono</string>
+    <string name="wallpaper_oled">Ninguno (negro OLED)</string>
 </resources>

@@ -55,6 +55,13 @@ final class Extras {
         return "stock";
     }
 
+    /** "Glass effect on icon edges": how strong the tiles' glass rim is, 0 (none) to 100. */
+    static final String RIM_INTENSITY = "rim_intensity";
+
+    static int rimIntensity(Context ctx) {
+        return Math.max(0, Math.min(100, prefs(ctx).getInt(RIM_INTENSITY, 60)));
+    }
+
     static String clockStyle(Context ctx) {
         String style = prefs(ctx).getString(CLOCK_STYLE, "normal");
         for (String s : CLOCK_STYLES) if (s.equals(style)) return s;

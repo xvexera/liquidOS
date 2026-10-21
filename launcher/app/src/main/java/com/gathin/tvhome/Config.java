@@ -266,7 +266,7 @@ final class Config {
         // An on-TV wallpaper pick overrides the theme: a filename from the wallpapers/
         // collection, or "none". Unset means the theme decides (off by default).
         String wallpaperChoice = choices.getString(WALLPAPER_CHOICE_KEY, null);
-        if ("none".equals(wallpaperChoice)) {
+        if ("none".equals(wallpaperChoice) || "oled".equals(wallpaperChoice)) {
             wallpapers.clear();
             wallpaper = null;
             wallpaperEnabled = false;

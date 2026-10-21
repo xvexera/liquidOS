@@ -11,7 +11,10 @@ import java.util.List;
  * None. Shared by Launcher settings and the quick wallpaper menu, which store the same choice string.
  */
 final class WallpaperChoices {
+    /** No picture: the app colour glow behind the glass ("Background from icon"). */
     static final String NONE = "none";
+    /** No picture and no glow: pure black, every pixel off on an OLED screen. */
+    static final String OLED = "oled";
 
     static final class Choice {
         /** What Config.WALLPAPER_CHOICE_KEY stores: "builtin:name", a file name, or "none". */
@@ -43,7 +46,8 @@ final class WallpaperChoices {
         File single = dir == null ? null : new File(dir, Config.WALLPAPER_NAME);
         if (single != null && single.isFile()) images.add(0, single);
         for (File image : images) list.add(new Choice(image.getName(), prettyName(image.getName()), image));
-        list.add(new Choice(NONE, ctx.getString(R.string.wallpaper_none), null));
+        list.add(new Choice(NONE, ctx.getString(R.string.wallpaper_icon), null));
+        list.add(new Choice(OLED, ctx.getString(R.string.wallpaper_oled), null));
         return list;
     }
 

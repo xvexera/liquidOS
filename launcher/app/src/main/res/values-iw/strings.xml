@@ -135,8 +135,6 @@
     <string name="screensaver_settings">שומר מסך</string>
     <string name="wallpaper_tierra">כדור הארץ מהמסלול</string>
     <string name="wallpaper_nebulosa">ערפילית</string>
-    <string name="wallpaper_via_lactea">שביל החלב</string>
-    <string name="wallpaper_luna">ירח</string>
     <string name="night_mode">מצב לילה</string>
     <string name="night_needs_permission">דורש הרשאת תצוגה מעל אפליקציות, שניתנת פעם אחת דרך adb: appops set com.gathin.tvhome SYSTEM_ALERT_WINDOW allow</string>
     <string name="widget_btc">שוק (BTC, ETH, S&amp;P 500…)</string>
@@ -219,4 +217,8 @@
     <string name="clock_style_glass">זכוכית</string>
     <string name="clock_style_glass_thin">זכוכית דקה</string>
     <string name="settings_blur_zero_note">טיפ: הפעילו אפקטים מתקדמים לחוויית זכוכית מלאה.</string>
+    <string name="rim_intensity">אפקט זכוכית בשולי הסמלים</string>
+    <string name="rim_intensity_hint">כמה שולי האפליקציות מחזירים אור כמו זכוכית; 0 מכבה.</string>
+    <string name="wallpaper_icon">רקע לפי סמל</string>
+    <string name="wallpaper_oled">ללא (שחור OLED)</string>
 </resources>

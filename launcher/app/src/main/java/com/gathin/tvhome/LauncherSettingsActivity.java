@@ -84,6 +84,8 @@ public final class LauncherSettingsActivity extends Activity {
                 i -> choices.edit().putString(Extras.ICON_PACK, Extras.ICON_PACKS[i]).apply());
         String[] styles = {getString(R.string.clock_style_normal), getString(R.string.clock_style_glass),
                 getString(R.string.clock_style_glass_thin)};
+        slider(home, getString(R.string.rim_intensity), getString(R.string.rim_intensity_hint), R.drawable.ic_brightness,
+                Extras.rimIntensity(this), v -> choices.edit().putInt(Extras.RIM_INTENSITY, v).apply());
         int styleAt = java.util.Arrays.asList(Extras.CLOCK_STYLES).indexOf(Extras.clockStyle(this));
         stepper(home, getString(R.string.clock_style), getString(R.string.clock_style_hint), styles,
                 Math.max(0, styleAt), i -> choices.edit().putString(Extras.CLOCK_STYLE, Extras.CLOCK_STYLES[i]).apply());

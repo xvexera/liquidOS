@@ -15,7 +15,7 @@ import java.util.Random;
 
 /**
  * Wallpapers drawn by the launcher itself, so there is nothing to download or license: soft colour fields in the
- * spirit of the tvOS and macOS gradients, and space scenes (Earth from orbit, a nebula, the Milky Way, the Moon).
+ * spirit of the tvOS and macOS gradients, and space scenes (Earth from orbit, a nebula).
  * Drawn once at half the screen size into the cache folder and read back from there; the wallpaper view
  * stretches them, which only softens gradients and haze further.
  */
@@ -24,7 +24,7 @@ final class BuiltinWallpapers {
     /** Bump when a picture's drawing changes, so cached copies are drawn again. */
     private static final int VERSION = 3;
 
-    private static final String[] SPACE = {"tierra", "nebulosa", "via_lactea", "luna"};
+    private static final String[] SPACE = {"tierra", "nebulosa"};
 
     /** Name, base top colour, base bottom colour, then blobs as {colour, x, y, radius} in fractions of the width. */
     private static final Object[][] GRADIENTS = {
@@ -88,8 +88,6 @@ final class BuiltinWallpapers {
             switch (name) {
                 case "tierra": earth(c, width, height); break;
                 case "nebulosa": nebula(c, width, height); break;
-                case "via_lactea": milkyWay(c, width, height); break;
-                case "luna": moon(c, width, height); break;
                 default: gradient(c, width, height, gradientStyle(name)); break;
             }
             // No darkened top left any more: the widgets there are glass like the pills, and a dark corner under
@@ -198,71 +196,4 @@ final class BuiltinWallpapers {
         stars(c, w, h, rnd, w * h / 500, 1f);
     }
 
-    /** The Milky Way as a diagonal band of haze, dust and crowded stars. */
-    private static void milkyWay(Canvas c, int w, int h) {
-        Random rnd = new Random(23);
-        c.drawColor(0xFF02030A);
-        stars(c, w, h, rnd, w * h / 1100, 1f);
-        // Along the band: from the bottom left to the top right.
-        float x0 = w * 0.05f, y0 = h * 1.05f, x1 = w * 1.0f, y1 = -h * 0.1f;
-        for (int i = 0; i < 40; i++) {
-            float t = rnd.nextFloat();
-            float x = x0 + (x1 - x0) * t + (rnd.nextFloat() - 0.5f) * w * 0.08f;
-            float y = y0 + (y1 - y0) * t + (rnd.nextFloat() - 0.5f) * h * 0.12f;
-            int colour = t > 0.35f && t < 0.6f ? 0xFFFFD9A8 : 0xFFB9C8FF;
-            glow(c, w, h, colour, x, y, w * (0.05f + rnd.nextFloat() * 0.09f), 18 + rnd.nextInt(26));
-        }
-        for (int i = 0; i < 18; i++) {
-            float t = rnd.nextFloat();
-            float x = x0 + (x1 - x0) * t + (rnd.nextFloat() - 0.5f) * w * 0.03f;
-            float y = y0 + (y1 - y0) * t + (rnd.nextFloat() - 0.5f) * h * 0.04f;
-            glow(c, w, h, 0xFF000000, x, y, w * (0.015f + rnd.nextFloat() * 0.04f), 110);
-        }
-        Paint p = paint();
-        for (int i = 0; i < w * h / 160; i++) {
-            float t = rnd.nextFloat();
-            float spread = (float) rnd.nextGaussian() * 0.06f;
-            float x = x0 + (x1 - x0) * t + spread * w * 0.6f;
-            float y = y0 + (y1 - y0) * t + spread * h;
-            p.setColor(0x00FFFFFF | (30 + rnd.nextInt(150)) << 24);
-            c.drawCircle(x, y, 0.45f + rnd.nextFloat() * 0.35f, p);
-        }
-    }
-
-    /** A large Moon on the right, lit from the right, with soft maria and a few craters. */
-    private static void moon(Canvas c, int w, int h) {
-        Random rnd = new Random(31);
-        c.drawColor(0xFF010103);
-        stars(c, w, h, rnd, w * h / 1400, 1f);
-        float r = h * 0.62f, cx = w * 0.86f, cy = h * 0.55f;
-        glow(c, w, h, 0xFFBFD3FF, cx, cy, r * 1.5f, 0x26);
-        c.save();
-        android.graphics.Path disc = new android.graphics.Path();
-        disc.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
-        c.clipPath(disc);
-        Paint p = paint();
-        p.setShader(new RadialGradient(cx + r * 0.35f, cy - r * 0.25f, r * 1.5f,
-                new int[]{0xFFE9E7E1, 0xFFB9B6AE, 0xFF4A4945}, new float[]{0f, 0.55f, 1f}, Shader.TileMode.CLAMP));
-        c.drawCircle(cx, cy, r, p);
-        p.setShader(null);
-        for (int i = 0; i < 9; i++) {   // maria
-            float x = cx + (rnd.nextFloat() - 0.4f) * r * 1.2f, y = cy + (rnd.nextFloat() - 0.5f) * r * 1.3f;
-            glow(c, w, h, 0xFF55534E, x, y, r * (0.15f + rnd.nextFloat() * 0.25f), 110);
-        }
-        Paint crater = paint();
-        crater.setStyle(Paint.Style.STROKE);
-        for (int i = 0; i < 40; i++) {
-            float x = cx + (rnd.nextFloat() - 0.5f) * r * 1.9f, y = cy + (rnd.nextFloat() - 0.5f) * r * 1.9f;
-            float cr = r * (0.01f + rnd.nextFloat() * 0.05f);
-            crater.setStrokeWidth(cr * 0.35f);
-            crater.setColor(0x33000000);
-            c.drawCircle(x + cr * 0.15f, y + cr * 0.15f, cr, crater);
-            crater.setColor(0x2EFFFFFF);
-            c.drawCircle(x - cr * 0.1f, y - cr * 0.1f, cr * 0.9f, crater);
-        }
-        // Terminator: the side away from the sun falls off into shadow.
-        p.setShader(new LinearGradient(cx - r, cy, cx + r * 0.2f, cy, 0xF0000000, 0x00000000, Shader.TileMode.CLAMP));
-        c.drawCircle(cx, cy, r, p);
-        c.restore();
-    }
 }

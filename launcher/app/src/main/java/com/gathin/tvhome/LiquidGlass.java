@@ -203,6 +203,7 @@ final class LiquidGlass {
         for (boolean focused : new boolean[]{true, false}) {
             Surface s = new Surface(radiusPx, density, focused);
             s.veil = true;
+            s.solid = false;   // a widget stays see-through glass even with no wallpaper behind it
             s.veilColor = focused ? 0x330A0A0E : 0x470A0A0E;
             d.addState(focused ? new int[]{android.R.attr.state_focused} : new int[0], s);
         }
@@ -213,10 +214,11 @@ final class LiquidGlass {
     static Drawable pill(float density) {
         float radius = 21 * density;
         StateListDrawable d = new StateListDrawable();
-        GradientDrawable focused = new GradientDrawable();
-        focused.setColor(0xF5FFFFFF);
-        focused.setCornerRadius(radius);
-        d.addState(new int[]{android.R.attr.state_focused}, focused);
+        d.setEnterFadeDuration(200);
+        d.setExitFadeDuration(200);
+        // Focused: the brighter glass of a focused widget, so the focus light can run over it (on solid white it
+        // could not show). The pill's text and icon stay white.
+        d.addState(new int[]{android.R.attr.state_focused}, new Surface(radius, density, true));
         GradientDrawable activated = new GradientDrawable();
         activated.setColor(0x596EC1FF);
         activated.setStroke(Math.round(1.5f * density), 0xFF6EC1FF);
@@ -335,6 +337,8 @@ final class LiquidGlass {
         private final float inset;
         /** panel() and widgetCard(): a dark layer between the glass and what sits on it. */
         boolean veil;
+        /** Menus: an almost opaque dark slab when there is no wallpaper to blur, so their rows stay readable. */
+        boolean solid = true;
         int veilColor = 0x6B0A0A0E;
         private final Paint veilPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -352,12 +356,12 @@ final class LiquidGlass {
             Callback cb = getCallback();
             // A StateListDrawable is the callback of the surfaces it holds; climb to the view.
             while (cb instanceof Drawable) cb = ((Drawable) cb).getCallback();
-            if (veil && backdrop == null) {
+            if (veil && solid && backdrop == null) {
                 veilPaint.setColor(0xF21C1C20);
                 canvas.drawRoundRect(rect, radius, radius, veilPaint);
             }
             LiquidGlass.draw(canvas, rect, radius, cb instanceof View ? (View) cb : null, paints, bright);
-            if (veil && backdrop != null) {
+            if (veil && (backdrop != null || !solid)) {
                 veilPaint.setColor(veilColor);
                 canvas.drawRoundRect(rect, radius, radius, veilPaint);
             }

@@ -83,7 +83,12 @@ final class GlintView extends View {
         float fromS = running ? strength : -1f;
         if (sweep != null) sweep.cancel();
         sweep = ValueAnimator.ofFloat(0f, 1f);
-        sweep.setDuration(650);
+        // The same speed on any object: the time follows the distance the light travels in pixels, so it crosses a
+        // wide widget card as fast as a tile or a pill, not in the same time.
+        float inset = 12f * density;
+        float along = dx != 0 ? Math.abs(REST_X - fromX) * (getWidth() - inset)
+                : Math.abs(REST_Y - fromY) * (getHeight() - inset);
+        sweep.setDuration(Math.max(420L, Math.min(1100L, Math.round(along / (0.30f * density)))));
         sweep.setInterpolator(new DecelerateInterpolator(1.4f));
         sweep.addUpdateListener(a -> {
             float t = (float) a.getAnimatedValue();
@@ -119,7 +124,8 @@ final class GlintView extends View {
         if (spot == null || strength <= 0f) return;
         float inset = 6f * density;   // the glass slab's inset, so the light covers the tile, not the glow
         rect.set(inset, inset, getWidth() - inset, getHeight() - inset);
-        float r = Math.max(rect.width(), rect.height()) * 0.6f;
+        // The same spot on any object: sized by the object's short side, not stretched across a wide card.
+        float r = Math.min(rect.width(), rect.height()) * 1.1f;
         matrix.setScale(r, r * 0.9f);
         matrix.postTranslate(rect.left + rect.width() * cx, rect.top + rect.height() * cy);
         spot.setLocalMatrix(matrix);

@@ -139,8 +139,6 @@
     <string name="screensaver_settings">Screensaver</string>
     <string name="wallpaper_tierra">Earth from orbit</string>
     <string name="wallpaper_nebulosa">Nebula</string>
-    <string name="wallpaper_via_lactea">Milky Way</string>
-    <string name="wallpaper_luna">Moon</string>
     <string name="night_mode">Night mode</string>
     <string name="night_needs_permission">Needs the overlay permission, granted once over adb: appops set com.gathin.tvhome SYSTEM_ALERT_WINDOW allow</string>
     <string name="widget_btc">Market (BTC, ETH, S&amp;P 500…)</string>
@@ -222,4 +220,8 @@
     <string name="clock_style_glass">Glass</string>
     <string name="clock_style_glass_thin">Thin glass</string>
     <string name="settings_blur_zero_note">Tip: turn on Advanced effects for the full clear-glass look.</string>
+    <string name="rim_intensity">Glass effect on icon edges</string>
+    <string name="rim_intensity_hint">How strongly the edges of the app tiles catch the light; 0 turns it off.</string>
+    <string name="wallpaper_icon">Background from icon</string>
+    <string name="wallpaper_oled">None (OLED black)</string>
 </resources>

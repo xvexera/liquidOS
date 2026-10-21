@@ -133,6 +133,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * picture it only tinted the photo faintly while its colour animation and repaint ran on every focus move.
      */
     private boolean glowOff;
+    /** The colour behind everything (config background_color), for the glass when there is no wallpaper. */
+    private int backgroundColor = 0xFF000000;
     private GlassView glass;
     private View ambient;
     private TextView heroName;
@@ -335,13 +337,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         root = findViewById(R.id.root);
         root.setBackgroundColor(cfg.backgroundColor);
+        backgroundColor = cfg.backgroundColor;
         // root fills the window with an opaque colour (Config keeps background_color opaque), so the window's own
         // black under it is a second full-screen fill on every frame for nothing. The starting window still uses
         // the theme's background, so launch looks the same.
         getWindow().setBackgroundDrawable(null);
         settingsRevision = Extras.revision(this);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
-        glowOff = wallpaperPlayer.current() != null || OnlineWallpapers.active(this);
+        boolean oled = WallpaperChoices.OLED.equals(getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
+                .getString(Config.WALLPAPER_CHOICE_KEY, null));
+        glowOff = oled || wallpaperPlayer.current() != null || OnlineWallpapers.active(this);
         liquidGlass = Extras.liquidGlass(this);
         if (liquidGlass) {
             int blur = Extras.glassBlur(this);
@@ -574,6 +579,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (liquidGlass) {
             for (View button : new View[]{btnInputs, btnWifi, btnCalendar, btnNight, btnReorder, btnSettings}) {
                 button.setBackground(LiquidGlass.pill(density));
+                ((TextView) button).setTextColor(0xFFFFFFFF);
+                ((TextView) button).setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
                 // Its own small layer: Android replays the whole window every frame of a grid scroll, and without
                 // one the refraction shader of every pill ran again each frame. Redrawn only when the pill changes.
                 if (!advancedEffects) button.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -634,9 +641,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (festive) applyFestiveSkin((TextView) btnInputs, (TextView) btnSettings);
 
         // Hide the glass when focus leaves the tiles.
+        // The focus light of the tiles, also on the top pills and the widget cards: one more GlintView, moved and
+        // resized over whichever of them has focus, entering from the side focus came from.
+        uiGlint = new GlintView(this);
+        uiGlint.setAlpha(0f);
+        root.addView(uiGlint, new FrameLayout.LayoutParams(10, 10));
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
             boolean onTile = newF != null && newF.getId() == R.id.card;
             if (!onTile) hideGlass();
+            lightUp(oldF, newF);
         });
 
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -656,6 +669,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .build(), vpnCallback);
         }
         applyClockStyle(Extras.clockStyle(this));
+        // No wallpaper: give the glass the plain background to show until the first app glow arrives.
+        scheduleGlowBackdrop();
         widgets = new HomeWidgets(this, density, liquidGlass, advancedEffects,
                 () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
         widgets.setOnMarketMenu(this::showMarketMenu);
@@ -930,6 +945,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // The last arrow pressed: the focus light enters the newly focused object from the side the move came from.
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            switch (event.getKeyCode()) {
+                case KeyEvent.KEYCODE_DPAD_LEFT: lastMoveX = -1; lastMoveY = 0; lastMoveAt = SystemClock.uptimeMillis(); break;
+                case KeyEvent.KEYCODE_DPAD_RIGHT: lastMoveX = 1; lastMoveY = 0; lastMoveAt = SystemClock.uptimeMillis(); break;
+                case KeyEvent.KEYCODE_DPAD_UP: lastMoveX = 0; lastMoveY = -1; lastMoveAt = SystemClock.uptimeMillis(); break;
+                case KeyEvent.KEYCODE_DPAD_DOWN: lastMoveX = 0; lastMoveY = 1; lastMoveAt = SystemClock.uptimeMillis(); break;
+                default: break;
+            }
+        }
         if (handleSettingsKey(event)) return true;
         if (!reordering) return super.dispatchKeyEvent(event);
         if (dockEditing) return dispatchDockEdit(event);
@@ -1329,6 +1354,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             springX.animateToFinalPosition(x);
             springY.animateToFinalPosition(y - glassScrollShift);
         }
+        if (recentMove()) {
+            fromX = lastMoveX;
+            fromY = lastMoveY;
+        }
         glint.sweep(fromX, fromY, animations && !reducedMotion);
         View item = (View) card.getParent();
         if (dockRow && position < COLUMNS) {
@@ -1595,6 +1624,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         // The default tint mode, SRC_IN, keeps the mask's alpha and takes the colour from the tint.
         glow.setTint(0xFF000000 | color);
+        scheduleGlowBackdrop();
     }
 
     private void transitionAmbient(int color) {
@@ -2615,6 +2645,88 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 v.invalidate();
             });
         }
+    }
+
+    /**
+     * Wallpaper "None": there is no picture for the glass to blur, so it takes what is behind it, the background colour
+     * and the app colour glow, and blurs that as the blur setting says. Rebuilt a moment after the glow settles on a
+     * new colour (a small bitmap), not on every frame of its fade.
+     */
+    private final Runnable glowBackdrop = () -> {
+        if (!liquidGlass || glowOff || isFinishing()) return;
+        int w = 480, h = 270;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        c.drawColor(backgroundColor);
+        Drawable g = ambient.getBackground();
+        if (g != null) {
+            // Draw the glow scaled down, without touching its own bounds: the glow view on screen keeps its full size.
+            c.save();
+            c.scale(w / (float) Math.max(1, ambient.getWidth()), h / (float) Math.max(1, ambient.getHeight()));
+            c.saveLayerAlpha(0, 0, ambient.getWidth(), ambient.getHeight(), Math.round(255 * ambient.getAlpha()));
+            g.draw(c);
+            c.restore();
+            c.restore();
+        }
+        LiquidGlass.setBackdrop(b, getResources().getDisplayMetrics().widthPixels,
+                getResources().getDisplayMetrics().heightPixels, 0, Extras.glassBlur(this));
+        invalidateGlass();
+    };
+
+    private void scheduleGlowBackdrop() {
+        if (!liquidGlass || glowOff) return;
+        handler.removeCallbacks(glowBackdrop);
+        handler.postDelayed(glowBackdrop, 150);
+    }
+
+    private GlintView uiGlint;
+    /** The last arrow pressed (-1, 0 or 1 on each axis) and when; for the side the focus light enters from. */
+    private int lastMoveX, lastMoveY;
+    private long lastMoveAt;
+
+    /** The move behind the focus change that is happening now: the last arrow, if it was pressed just now. */
+    private boolean recentMove() {
+        return SystemClock.uptimeMillis() - lastMoveAt < 600 && (lastMoveX != 0 || lastMoveY != 0);
+    }
+
+    /** The views that get the glass glow on focus: the top pills (the widget cards only cross-fade their glass). */
+    private boolean litView(View v) {
+        if (v == null) return false;
+        int id = v.getId();
+        return id == R.id.btnInputs || id == R.id.btnWifi || id == R.id.btnCalendar || id == R.id.btnNight
+                || id == R.id.btnReorder || id == R.id.btnSettings;
+    }
+
+    /** Puts the glow on {@code to} at its size and corners, and fades it in. */
+    private void lightUp(View from, View to) {
+        if (uiGlint == null) return;
+        if (!litView(to) || !to.isShown() || !to.isAttachedToWindow()) {
+            uiGlint.animate().cancel();
+            uiGlint.animate().alpha(0f).setDuration(animations ? 140 : 0).start();
+            return;
+        }
+        Rect r = new Rect(0, 0, to.getWidth(), to.getHeight());
+        root.offsetDescendantRectToMyCoords(to, r);
+        int pad = (int) (6 * density);   // GlintView keeps 6dp round the slab for nothing else to draw in
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) uiGlint.getLayoutParams();
+        lp.width = r.width() + 2 * pad;
+        lp.height = r.height() + 2 * pad;
+        uiGlint.setLayoutParams(lp);
+        uiGlint.setTranslationX(r.left - pad);
+        uiGlint.setTranslationY(r.top - pad);
+        boolean pill = to.getId() != R.id.btcCard && to.getId() != R.id.playerCard;
+        uiGlint.setRadius(pill ? r.height() / 2f : 22 * density);
+        // A widget card zooms a little with advanced effects: the light zooms with it, from the same centre.
+        float scale = !pill && advancedEffects && animations ? 1.04f : 1f;
+        uiGlint.setPivotX(lp.width / 2f);
+        uiGlint.setPivotY(lp.height / 2f);
+        uiGlint.setScaleX(scale);
+        uiGlint.setScaleY(scale);
+        // The pills get no travelling light: a soft glass glow at their top that fades in with focus.
+        uiGlint.sweep(0f, 0f, false);
+        uiGlint.animate().cancel();
+        uiGlint.setAlpha(0f);
+        uiGlint.animate().alpha(1f).setDuration(animations ? 220 : 0).start();
     }
 
     /** Repaints every Liquid Glass surface after the blurred wallpaper behind them changed. */
