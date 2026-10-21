@@ -1,33 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher settings in sections, top to bottom: Apps, Home screen, Wallpaper, Liquid Glass, Widgets, Motion,
+     System. Rows are focusable text views: OK toggles a switch, cycles a choice or opens a picker. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF101419"
+    android:background="#FF0B0E13"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="72dp"
-        android:paddingEnd="72dp"
+        android:paddingStart="96dp"
+        android:paddingEnd="96dp"
         android:paddingTop="38dp"
-        android:paddingBottom="38dp">
+        android:paddingBottom="48dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/launcher_settings"
             android:textColor="#FFFFFFFF"
-            android:textSize="34sp" />
+            android:textSize="34sp"
+            android:fontFamily="@font/outfit_light" />
+
+        <!-- Apps -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_apps" />
+
+        <TextView android:id="@+id/reorderAppsChoice" style="@style/SettingsRow" android:text="@string/organize_apps" />
+        <TextView style="@style/SettingsHint" android:text="@string/organize_settings_hint" />
+
+        <!-- Home screen -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_home" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
             android:text="@string/columns_label"
             android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:textSize="18sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -47,7 +58,7 @@
             android:layout_marginTop="18dp"
             android:text="@string/rows_below_dock_label"
             android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:textSize="18sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -61,61 +72,48 @@
             <TextView android:id="@+id/rows3" style="@style/SettingsColumnChoice" android:text="3" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/wallpaperChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="28dp" />
+        <!-- Wallpaper -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_wallpaper" />
 
-        <TextView
-            android:id="@+id/animationsChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="28dp" />
+        <TextView android:id="@+id/wallpaperChoice" style="@style/SettingsRow" />
+        <TextView android:id="@+id/wallpaperDimChoice" style="@style/SettingsRow" android:layout_marginTop="10dp" />
+        <TextView style="@style/SettingsHint" android:text="@string/wallpaper_settings_hint" />
 
-        <TextView
-            android:id="@+id/advancedChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="10dp" />
+        <!-- Liquid Glass -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_glass" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/advanced_effects_warning"
-            android:textColor="#FFACB8C1"
-            android:textSize="14sp" />
+        <TextView android:id="@+id/liquidGlassChoice" style="@style/SettingsRow" />
+        <TextView android:id="@+id/glassBlurChoice" style="@style/SettingsRow" android:layout_marginTop="10dp" />
+        <TextView style="@style/SettingsHint" android:text="@string/glass_hint" />
 
-        <TextView
-            android:id="@+id/followThemeChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="18dp"
-            android:text="@string/follow_theme" />
+        <!-- Widgets -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_widgets" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:text="@string/follow_theme_hint"
-            android:textColor="#FFACB8C1"
-            android:textSize="14sp" />
+        <TextView android:id="@+id/btcChoice" style="@style/SettingsRow" />
+        <TextView android:id="@+id/nowPlayingChoice" style="@style/SettingsRow" android:layout_marginTop="10dp" />
+        <TextView android:id="@+id/nowPlayingHint" style="@style/SettingsHint" android:text="@string/now_playing_hint" />
 
-        <TextView
-            android:id="@+id/defaultHomeChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="28dp"
+        <!-- Motion -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_motion" />
+
+        <TextView android:id="@+id/animationsChoice" style="@style/SettingsRow" />
+        <TextView android:id="@+id/advancedChoice" style="@style/SettingsRow" android:layout_marginTop="10dp" />
+        <TextView style="@style/SettingsHint" android:text="@string/advanced_effects_warning" />
+
+        <!-- System -->
+        <TextView style="@style/SettingsSection" android:text="@string/section_system" />
+
+        <TextView android:id="@+id/screensaverChoice" style="@style/SettingsRow" android:text="@string/screensaver_settings" />
+
+        <TextView android:id="@+id/defaultHomeChoice" style="@style/SettingsRow" android:layout_marginTop="10dp"
             android:text="@string/home_settings" />
+        <TextView style="@style/SettingsHint" android:text="@string/home_settings_help" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:text="@string/home_settings_help"
-            android:textColor="#FFACB8C1"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/tvSettingsChoice"
-            style="@style/SettingsRow"
-            android:layout_marginTop="18dp"
+        <TextView android:id="@+id/tvSettingsChoice" style="@style/SettingsRow" android:layout_marginTop="10dp"
             android:text="@string/tv_settings" />
+
+        <TextView android:id="@+id/followThemeChoice" style="@style/SettingsRow" android:layout_marginTop="10dp"
+            android:text="@string/follow_theme" />
+        <TextView style="@style/SettingsHint" android:text="@string/follow_theme_hint" />
     </LinearLayout>
 </ScrollView>

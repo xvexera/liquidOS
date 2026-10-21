@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Night mode panel under the moon pill: on/off, then the dim and warm sliders (Left and Right move them). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/glass_panel"
+    android:padding="8dp"
+    android:elevation="12dp">
+
+    <TextView
+        android:id="@+id/nightToggle"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:background="@drawable/input_row_bg"
+        android:drawableStart="@drawable/ic_moon"
+        android:drawablePadding="10dp"
+        android:drawableTint="@drawable/pill_text"
+        android:textColor="@drawable/pill_text"
+        android:textSize="15sp"
+        android:fontFamily="@font/outfit_medium"
+        android:focusable="true"
+        android:clickable="true" />
+
+    <TextView
+        android:id="@+id/nightDimLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:paddingStart="12dp"
+        android:textColor="#B3FFFFFF"
+        android:textSize="12sp"
+        android:fontFamily="@font/outfit_medium"
+        android:letterSpacing="0.06" />
+
+    <SeekBar
+        android:id="@+id/nightDim"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:max="90"
+        android:progressDrawable="@drawable/seek_track"
+        android:thumb="@drawable/seek_thumb"
+        android:splitTrack="false"
+        android:background="@null"
+        android:focusable="true" />
+
+    <TextView
+        android:id="@+id/nightWarmLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:paddingStart="12dp"
+        android:textColor="#B3FFFFFF"
+        android:textSize="12sp"
+        android:fontFamily="@font/outfit_medium"
+        android:letterSpacing="0.06" />
+
+    <SeekBar
+        android:id="@+id/nightWarm"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:max="100"
+        android:progressDrawable="@drawable/seek_track"
+        android:thumb="@drawable/seek_thumb"
+        android:splitTrack="false"
+        android:background="@null"
+        android:focusable="true" />
+
+    <TextView
+        android:id="@+id/nightHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="4dp"
+        android:textColor="#99FFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+</LinearLayout>

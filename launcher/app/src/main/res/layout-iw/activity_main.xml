@@ -299,6 +299,196 @@
                 android:focusable="false"
                 android:visibility="gone" />
 
+            <!-- Home widgets under the clock: BTC/USDT and the now playing card, on Liquid Glass. Each is shown
+                 only when switched on in Launcher settings; the row is gone when both are. -->
+            <LinearLayout
+                android:id="@+id/widgets"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/stats"
+                android:layout_alignStart="@id/leftBlock"
+                android:layout_marginTop="18dp"
+                android:orientation="horizontal"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/btcCard"
+                    android:layout_width="wrap_content"
+                    android:layout_height="84dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:focusable="false"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:background="@drawable/btc_badge"
+                                android:gravity="center"
+                                android:includeFontPadding="false"
+                                android:text="₿"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/btcPair"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="7dp"
+                                android:text="BTC/USDT"
+                                android:textColor="#B3FFFFFF"
+                                android:textSize="11sp"
+                                android:fontFamily="@font/outfit_medium"
+                                android:letterSpacing="0.16" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/btcPrice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minWidth="128dp"
+                            android:singleLine="true"
+                            android:text="—"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="24sp"
+                            android:fontFamily="@font/outfit_light"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/btcChange"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:singleLine="true"
+                            android:textColor="#99FFFFFF"
+                            android:textSize="12sp"
+                            android:fontFamily="@font/outfit_medium" />
+                    </LinearLayout>
+
+                    <com.gathin.tvhome.SparklineView
+                        android:id="@+id/btcSpark"
+                        android:layout_width="96dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="16dp" />
+                </LinearLayout>
+
+                <!-- Left and Right choose previous, play/pause or next; OK presses it; a long OK opens the app. -->
+                <LinearLayout
+                    android:id="@+id/playerCard"
+                    android:layout_width="wrap_content"
+                    android:layout_height="84dp"
+                    android:layout_marginStart="14dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:focusable="true"
+                    android:clickable="true"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/playerArt"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:scaleType="centerCrop"
+                        android:importantForAccessibility="no" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/playerKicker"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="240dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#99FFFFFF"
+                            android:textSize="10sp"
+                            android:fontFamily="@font/outfit_medium"
+                            android:letterSpacing="0.16"
+                            android:textAllCaps="true" />
+
+                        <TextView
+                            android:id="@+id/playerTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:maxWidth="240dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="16sp"
+                            android:fontFamily="@font/outfit_medium" />
+
+                        <TextView
+                            android:id="@+id/playerArtist"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="1dp"
+                            android:maxWidth="240dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="13sp"
+                            android:fontFamily="@font/outfit_regular" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/playerPrev"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="14dp"
+                        android:padding="9dp"
+                        android:background="@drawable/player_button_bg"
+                        android:tint="@color/player_button_tint"
+                        android:src="@drawable/ic_skip_prev"
+                        android:importantForAccessibility="no" />
+
+                    <ImageView
+                        android:id="@+id/playerToggle"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="6dp"
+                        android:padding="8dp"
+                        android:background="@drawable/player_button_bg"
+                        android:tint="@color/player_button_tint"
+                        android:src="@drawable/ic_play"
+                        android:importantForAccessibility="no" />
+
+                    <ImageView
+                        android:id="@+id/playerNext"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="6dp"
+                        android:padding="9dp"
+                        android:background="@drawable/player_button_bg"
+                        android:tint="@color/player_button_tint"
+                        android:src="@drawable/ic_skip_next"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/topButtons"
                 android:layout_width="wrap_content"
@@ -334,6 +524,14 @@
                     android:drawableStart="@drawable/ic_wifi"
                     android:nextFocusDown="@+id/grid" />
 
+                <!-- Night mode: dim and warm filter over every app; see NightLight. -->
+                <TextView
+                    android:id="@+id/btnNight"
+                    style="@style/TopButtonIcon"
+                    android:contentDescription="@string/night_mode"
+                    android:drawableStart="@drawable/ic_moon"
+                    android:nextFocusDown="@+id/grid" />
+
                 <TextView
                     android:id="@+id/btnInputs"
                     style="@style/TopButton"
@@ -363,6 +561,23 @@
                 android:descendantFocusability="afterDescendants" />
         </FrameLayout>
     </LinearLayout>
+
+    <!-- Online wallpapers: the photographer's credit, as Unsplash asks. Shown only while one is up. -->
+    <TextView
+        android:id="@+id/onlineCredit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="98dp"
+        android:layout_marginEnd="64dp"
+        android:textColor="#99FFFFFF"
+        android:textSize="10sp"
+        android:fontFamily="@font/outfit_medium"
+        android:letterSpacing="0.04"
+        android:shadowColor="#99000000"
+        android:shadowRadius="4"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
 
     <!-- The single floating glass highlight that springs between tiles. -->
     <com.gathin.tvhome.GlassView

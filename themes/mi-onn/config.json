@@ -1,0 +1,10 @@
+{
+  "dock_apps": ["com.spotify.tv.android", "org.smarttube.stable", "com.stremio.one", "ar.com.flow.androidtv"],
+  "hidden_apps": [],
+  "live_tv_package": "",
+  "columns": 4,
+  "rows_below_dock": 0,
+  "app_library": true,
+  "background_color": "#000000",
+  "wallpaper": false
+}

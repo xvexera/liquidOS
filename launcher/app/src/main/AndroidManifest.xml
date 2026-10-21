@@ -9,6 +9,14 @@
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- The BTC/USDT widget only: Binance's public ticker (CoinGecko as fallback), once a minute while Home is in
+         front. Switch the widget off in Launcher settings and nothing is fetched. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Night mode: the dim and warm overlay over every app (granted over adb, see NightLight), kept up by a
+         foreground service while an app is in front. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Needed since Android 10 to read the Wi-Fi network name for the network pill. Never requested at
          runtime: build-and-install grants it with pm grant, so lint's Android 12 "ask for COARSE with
          FINE" rule does not apply here. -->
@@ -110,6 +118,27 @@
                 <action android:name="android.service.dreams.DreamService" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+        </service>
+
+        <!-- Lets the now playing card read the active media sessions; it reads no notifications. Granted over adb:
+             cmd notification allow_listener com.gathin.tvhome/com.gathin.tvhome.MediaListener -->
+        <service
+            android:name=".MediaListener"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".NightLightService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Screen dimmer and warm colour filter drawn over other apps at night" />
         </service>
 
         <!-- tools/theme.sh writes the theme through this where the shell can't reach Android/data;
