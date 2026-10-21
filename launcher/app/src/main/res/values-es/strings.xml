@@ -165,13 +165,18 @@
     <string name="settings_blur_hint">Cuánto se ve el fondo a través del vidrio: 0 es casi nítido, 100 es muy difuso.</string>
     <string name="online_never">Nunca (solo manual)</string>
     <string name="icon_pack">Pack de iconos</string>
-    <string name="icon_pack_hint">Stock usa la imagen de cada app; Monocromo la pasa a blanco y negro; Minimal muestra solo el nombre.</string>
+    <string name="icon_pack_hint">Stock usa la imagen de cada app; Glass muestra solo el logo sobre vidrio esmerilado.</string>
     <string name="icon_pack_stock">Stock</string>
-    <string name="icon_pack_mono">Monocromo</string>
-    <string name="icon_pack_minimal">Minimal</string>
     <string name="screensaver_after">Activar salvapantallas tras</string>
     <string name="screensaver_configure">Configurar salvapantallas</string>
     <string name="screensaver_none">No hay salvapantallas instalados</string>
     <string name="screensaver_needs_grant">Necesita dos permisos por adb: WRITE_SECURE_SETTINGS y WRITE_SETTINGS</string>
     <string name="screensaver_no_settings">Este salvapantallas no tiene ajustes propios</string>
+    <string name="icon_pack_glass">Glass</string>
+    <string name="clock_style">Estilo del reloj y la fecha</string>
+    <string name="clock_style_hint">Las letras glass se ven esmeriladas e iluminadas desde arriba.</string>
+    <string name="clock_style_normal">Normal</string>
+    <string name="clock_style_glass">Glass</string>
+    <string name="clock_style_glass_thin">Glass fino</string>
+    <string name="settings_blur_zero_note">Consejo: activa Efectos avanzados para una experiencia de vidrio completa.</string>
 </resources>

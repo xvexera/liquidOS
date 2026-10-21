@@ -205,13 +205,18 @@
     <string name="settings_blur_hint">כמה מהטפט נראה דרך הזכוכית: 0 כמעט חד, 100 רך מאוד.</string>
     <string name="online_never">אף פעם (רק ידנית)</string>
     <string name="icon_pack">חבילת סמלים</string>
-    <string name="icon_pack_hint">מקורי משתמש בתמונה של כל אפליקציה; מונוכרום הופך אותה לשחור-לבן; מינימלי מציג רק את השם.</string>
+    <string name="icon_pack_hint">מקורי משתמש בתמונה של כל אפליקציה; זכוכית מציגה רק את הלוגו על זכוכית חלבית.</string>
     <string name="icon_pack_stock">מקורי</string>
-    <string name="icon_pack_mono">מונוכרום</string>
-    <string name="icon_pack_minimal">מינימלי</string>
     <string name="screensaver_after">הפעלת שומר מסך אחרי</string>
     <string name="screensaver_configure">הגדרות שומר המסך</string>
     <string name="screensaver_none">אין שומר מסך מותקן</string>
     <string name="screensaver_needs_grant">דורש שתי הרשאות דרך adb: WRITE_SECURE_SETTINGS ו-WRITE_SETTINGS</string>
     <string name="screensaver_no_settings">לשומר מסך זה אין הגדרות משלו</string>
+    <string name="icon_pack_glass">זכוכית</string>
+    <string name="clock_style">סגנון השעון והתאריך</string>
+    <string name="clock_style_hint">אותיות זכוכית נראות חלביות ומוארות מלמעלה.</string>
+    <string name="clock_style_normal">רגיל</string>
+    <string name="clock_style_glass">זכוכית</string>
+    <string name="clock_style_glass_thin">זכוכית דקה</string>
+    <string name="settings_blur_zero_note">טיפ: הפעילו אפקטים מתקדמים לחוויית זכוכית מלאה.</string>
 </resources>

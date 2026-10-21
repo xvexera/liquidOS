@@ -20,9 +20,12 @@ final class Extras {
     /** How strongly Liquid Glass blurs the wallpaper behind it, 0 (almost sharp) to 100. */
     static final String GLASS_BLUR_PERCENT = "glass_blur_percent";
     static final String WALLPAPER_DIM = "wallpaper_dim";
-    /** How app tiles look: "stock" (the apps' own banners), "mono" (the same in black and white), "minimal" (the name). */
+    /** How app tiles look: "stock" (the apps' own banners) or "glass" (each logo alone on a light glass tile). */
     static final String ICON_PACK = "icon_pack";
-    static final String[] ICON_PACKS = {"stock", "mono", "minimal"};
+    static final String[] ICON_PACKS = {"stock", "glass"};
+    /** The greeting, clock and date: "normal" (solid white), "glass" (frosted, lit from above), "glass_thin". */
+    static final String CLOCK_STYLE = "clock_style";
+    static final String[] CLOCK_STYLES = {"normal", "glass", "glass_thin"};
     /** The market widget's assets (MarketTicker.Asset ids, comma-separated) and whether their line shows. */
     static final String MARKET_ASSET = "market_asset";
     static final String MARKET_CHART = "market_chart";
@@ -50,6 +53,12 @@ final class Extras {
         String pack = prefs(ctx).getString(ICON_PACK, "stock");
         for (String p : ICON_PACKS) if (p.equals(pack)) return p;
         return "stock";
+    }
+
+    static String clockStyle(Context ctx) {
+        String style = prefs(ctx).getString(CLOCK_STYLE, "normal");
+        for (String s : CLOCK_STYLES) if (s.equals(style)) return s;
+        return "normal";
     }
 
     static boolean btcTicker(Context ctx) {

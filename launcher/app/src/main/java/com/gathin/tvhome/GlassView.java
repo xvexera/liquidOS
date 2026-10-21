@@ -72,6 +72,9 @@ public class GlassView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        // Apple TV style: the focused tile shows no frame, only the light GlintView passes over it. The slab and rim
+        // are drawn only in a mode that needs to be seen (blue while organizing apps, a festival's colour).
+        if (glowRgb == 0xFFFFFF) return;
         float inset = 6f * density;   // room for the glow
         rect.set(inset, inset, getWidth() - inset, getHeight() - inset);
 

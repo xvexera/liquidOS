@@ -208,13 +208,18 @@
     <string name="settings_blur_hint">How much of the wallpaper shows through the glass: 0 is nearly sharp, 100 is soft.</string>
     <string name="online_never">Never (only manually)</string>
     <string name="icon_pack">Icon pack</string>
-    <string name="icon_pack_hint">Stock uses the artwork of each app; Monochrome turns it black and white; Minimal shows only the name.</string>
+    <string name="icon_pack_hint">Stock uses the artwork of each app; Glass shows each logo alone on frosted glass.</string>
     <string name="icon_pack_stock">Stock</string>
-    <string name="icon_pack_mono">Monochrome</string>
-    <string name="icon_pack_minimal">Minimal</string>
     <string name="screensaver_after">Start screensaver after</string>
     <string name="screensaver_configure">Screensaver settings</string>
     <string name="screensaver_none">No screensaver installed</string>
     <string name="screensaver_needs_grant">Needs two grants over adb: WRITE_SECURE_SETTINGS and WRITE_SETTINGS</string>
     <string name="screensaver_no_settings">This screensaver has no settings of its own</string>
+    <string name="icon_pack_glass">Glass</string>
+    <string name="clock_style">Clock and date style</string>
+    <string name="clock_style_hint">Glass letters look frosted and lit from above.</string>
+    <string name="clock_style_normal">Normal</string>
+    <string name="clock_style_glass">Glass</string>
+    <string name="clock_style_glass_thin">Thin glass</string>
+    <string name="settings_blur_zero_note">Tip: turn on Advanced effects for the full clear-glass look.</string>
 </resources>

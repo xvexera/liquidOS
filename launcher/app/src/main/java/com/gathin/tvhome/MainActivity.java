@@ -576,7 +576,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 button.setBackground(LiquidGlass.pill(density));
                 // Its own small layer: Android replays the whole window every frame of a grid scroll, and without
                 // one the refraction shader of every pill ran again each frame. Redrawn only when the pill changes.
-                button.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                if (!advancedEffects) button.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             }
         }
 
@@ -655,7 +655,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
                     .build(), vpnCallback);
         }
-        widgets = new HomeWidgets(this, density, liquidGlass,
+        applyClockStyle(Extras.clockStyle(this));
+        widgets = new HomeWidgets(this, density, liquidGlass, advancedEffects,
                 () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
         widgets.setOnMarketMenu(this::showMarketMenu);
         // Not after recreate(): the launch intent survives it and would open the settings again.
@@ -2465,7 +2466,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private PopupWindow glassPopup(View panel, int width) {
         // Liquid Glass menus: the blurred wallpaper under a dark veil. Drawn once per focus move, like the pills.
-        if (liquidGlass) panel.setBackground(LiquidGlass.panel(20 * density, density));
+        // With advanced effects the menus are the dock's clear refracting glass; otherwise the darker veiled glass.
+        if (liquidGlass) {
+            panel.setBackground(advancedEffects ? LiquidGlass.clearPanel(20 * density, density)
+                    : LiquidGlass.panel(20 * density, density));
+        }
         final PopupWindow popup = new PopupWindow(panel, width, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));   // needed for Back to dismiss
         popup.setOutsideTouchable(true);
@@ -2481,12 +2486,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Drop in: fade and unfold from the top edge, hanging under the anchor pill. */
     private void dropIn(PopupWindow popup, View panel, View anchor, int gravity) {
         panel.setAlpha(0f);
-        panel.setPivotY(0f);
-        panel.setScaleY(0.92f);
-        panel.setTranslationY(-8 * density);
-        popup.showAsDropDown(anchor, 0, (int) (10 * density), gravity);
-        panel.animate().alpha(1f).scaleY(1f).translationY(0f).setDuration(220)
-                .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+        if (advancedEffects && animations) {
+            // Unfold from the pill, the glass redrawn on every frame so the wallpaper behind it never jumps.
+            panel.setPivotY(0f);
+            panel.setScaleY(0.92f);
+            panel.setTranslationY(-8 * density);
+            popup.showAsDropDown(anchor, 0, (int) (10 * density), gravity);
+            panel.animate().alpha(1f).scaleY(1f).translationY(0f).setDuration(220)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f))
+                    .setUpdateListener(a -> panel.invalidate()).start();
+        } else {
+            // A plain fade in place: the glass is drawn once, where the menu stays, so nothing shifts under it.
+            popup.showAsDropDown(anchor, 0, (int) (10 * density), gravity);
+            panel.animate().alpha(1f).setDuration(animations ? 200 : 0).start();
+        }
     }
 
     private void addSeparator(LinearLayout rows) {
@@ -2580,6 +2593,28 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             });
         }
         return row;
+    }
+
+    /**
+     * Glass lettering for the greeting, clock and date: white fading towards the bottom like frosted glass lit from
+     * above, with a soft shadow under it; "glass_thin" also uses the thinnest weight. Drawn once per text change.
+     */
+    private void applyClockStyle(String style) {
+        if (style.equals("normal")) return;
+        int[] ids = {R.id.greeting, R.id.clock, R.id.ampm, R.id.date, R.id.shamsiDate};
+        for (int id : ids) {
+            TextView t = findViewById(id);
+            if (t == null) continue;
+            if (style.equals("glass_thin") && id == R.id.clock) t.setTypeface(getResources().getFont(R.font.outfit_extralight));
+            t.setTextColor(0xFFFFFFFF);
+            t.setShadowLayer(10 * density, 0, 2 * density, 0x55000000);
+            t.addOnLayoutChangeListener((v, l, top, r, b, ol, ot, or, ob) -> {
+                if (b - top == ob - ot && ((TextView) v).getPaint().getShader() != null) return;
+                ((TextView) v).getPaint().setShader(new LinearGradient(0, 0, 0, b - top,
+                        new int[]{0xFFFFFFFF, 0xCCFFFFFF, 0x80FFFFFF}, new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
+                v.invalidate();
+            });
+        }
     }
 
     /** Repaints every Liquid Glass surface after the blurred wallpaper behind them changed. */

@@ -78,11 +78,15 @@ public final class LauncherSettingsActivity extends Activity {
         View firstRow = stepper(home, getString(R.string.settings_rows), getString(R.string.settings_rows_hint),
                 new String[]{"0", "1", "2", "3"}, config.rowsBelowDock,
                 i -> choices.edit().putInt(Config.ROWS_BELOW_DOCK_KEY, i).apply());
-        String[] packs = {getString(R.string.icon_pack_stock), getString(R.string.icon_pack_mono),
-                getString(R.string.icon_pack_minimal)};
+        String[] packs = {getString(R.string.icon_pack_stock), getString(R.string.icon_pack_glass)};
         int packAt = java.util.Arrays.asList(Extras.ICON_PACKS).indexOf(Extras.iconPack(this));
         stepper(home, getString(R.string.icon_pack), getString(R.string.icon_pack_hint), packs, Math.max(0, packAt),
                 i -> choices.edit().putString(Extras.ICON_PACK, Extras.ICON_PACKS[i]).apply());
+        String[] styles = {getString(R.string.clock_style_normal), getString(R.string.clock_style_glass),
+                getString(R.string.clock_style_glass_thin)};
+        int styleAt = java.util.Arrays.asList(Extras.CLOCK_STYLES).indexOf(Extras.clockStyle(this));
+        stepper(home, getString(R.string.clock_style), getString(R.string.clock_style_hint), styles,
+                Math.max(0, styleAt), i -> choices.edit().putString(Extras.CLOCK_STYLE, Extras.CLOCK_STYLES[i]).apply());
 
         // Wallpaper
         LinearLayout wallpaper = section(left, R.string.section_wallpaper);
@@ -101,9 +105,17 @@ public final class LauncherSettingsActivity extends Activity {
             choices.edit().putBoolean(Extras.LIQUID_GLASS, on).apply();
             enable(blurRow, on);
         });
+        TextView[] zeroNote = {null};
         blurRow = slider(glass, getString(R.string.settings_blur), getString(R.string.settings_blur_hint),
-                R.drawable.ic_blur, Extras.glassBlur(this),
-                v -> choices.edit().putInt(Extras.GLASS_BLUR_PERCENT, v).apply());
+                R.drawable.ic_blur, Extras.glassBlur(this), v -> {
+                    choices.edit().putInt(Extras.GLASS_BLUR_PERCENT, v).apply();
+                    if (zeroNote[0] != null) zeroNote[0].setVisibility(v == 0 ? View.VISIBLE : View.GONE);
+                });
+        // At 0 the glass is clear and its refraction is the whole effect: advanced effects keep it on while moving.
+        zeroNote[0] = text(getString(R.string.settings_blur_zero_note), 12, R.font.outfit_medium, 0xFF64D2FF);
+        zeroNote[0].setPadding(0, dp(8), 0, 0);
+        zeroNote[0].setVisibility(Extras.glassBlur(this) == 0 ? View.VISIBLE : View.GONE);
+        ((LinearLayout) blurRow).addView(zeroNote[0]);
         enable(blurRow, Extras.liquidGlass(this));
 
         // Motion

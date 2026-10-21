@@ -171,6 +171,18 @@ final class LiquidGlass {
         return s;
     }
 
+    /**
+     * Advanced effects' menus: the clear glass of the dock (a light veil only, a wider bending rim), redrawn with the
+     * wallpaper under it every time the menu repaints.
+     */
+    static Surface clearPanel(float radiusPx, float density) {
+        Surface s = new Surface(radiusPx, density, false);
+        s.veil = true;
+        s.veilColor = 0x380A0A0E;
+        s.paints.bezel = 18 * density;
+        return s;
+    }
+
     /** Resting glass, a brighter glass while focused. */
     static Drawable focusableSurface(float radiusPx, float density) {
         StateListDrawable d = new StateListDrawable();
@@ -185,6 +197,9 @@ final class LiquidGlass {
      */
     static Drawable widgetCard(float radiusPx, float density) {
         StateListDrawable d = new StateListDrawable();
+        // Rest and focus cross-fade instead of switching in one frame.
+        d.setEnterFadeDuration(220);
+        d.setExitFadeDuration(220);
         for (boolean focused : new boolean[]{true, false}) {
             Surface s = new Surface(radiusPx, density, focused);
             s.veil = true;
@@ -240,6 +255,10 @@ final class LiquidGlass {
             host.getLocationOnScreen(p.loc);
             p.matrix.setScale(backdropScale, backdropScale);
             p.matrix.postTranslate(-p.loc[0], -p.loc[1]);
+            // A view drawn scaled (a focused card zooming, a menu unfolding) covers more or less screen than its own
+            // size: undo the scale so the glass still shows exactly the wallpaper behind it, not a zoomed copy.
+            float sx = host.getScaleX(), sy = host.getScaleY();
+            if (sx > 0f && sy > 0f && (sx != 1f || sy != 1f)) p.matrix.postScale(1f / sx, 1f / sy);
             p.shader.setLocalMatrix(p.matrix);
             if (refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && p.refraction != null
                     && canvas.isHardwareAccelerated()) {

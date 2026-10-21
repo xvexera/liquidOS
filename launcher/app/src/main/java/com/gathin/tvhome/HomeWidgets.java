@@ -57,7 +57,12 @@ final class HomeWidgets {
     private Bitmap shownArt;
     private String shownArtPackage;
 
-    HomeWidgets(Activity activity, float density, boolean liquidGlass, Runnable focusDock, Runnable focusTopBar) {
+    /** Advanced effects: the cards' glass is redrawn live while they zoom; otherwise cached, with a fade. */
+    private final boolean advanced;
+
+    HomeWidgets(Activity activity, float density, boolean liquidGlass, boolean advanced, Runnable focusDock,
+                Runnable focusTopBar) {
+        this.advanced = advanced;
         this.activity = activity;
         this.focusDock = focusDock;
         this.focusTopBar = focusTopBar;
@@ -74,8 +79,9 @@ final class HomeWidgets {
         for (View card : new View[]{btcCard, playerCard}) {
             if (liquidGlass) {
                 card.setBackground(LiquidGlass.widgetCard(radius, density));
-                // Cached as a layer, like the pills: the glass shader runs when the card changes, not every frame.
-                card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                // Without advanced effects: cached as a layer, like the pills; the shader runs when the card changes.
+                // With them: drawn live, so the glass follows the card as it zooms.
+                if (!advanced) card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             } else {
                 StateListDrawable d = new StateListDrawable();
                 d.addState(new int[]{android.R.attr.state_focused}, flat(radius, 0x66FFFFFF, density));
@@ -83,8 +89,7 @@ final class HomeWidgets {
                 card.setBackground(d);
             }
         }
-        btcCard.setOnFocusChangeListener((v, focused) ->
-                v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(160).start());
+        btcCard.setOnFocusChangeListener((v, focused) -> focusCard(v, focused));
         btcCard.setOnKeyListener((v, keyCode, event) -> onMarketKey(keyCode, event));
         // A soft shadow under the widgets' text, so green and red figures stay legible over a bright wallpaper
         // without darkening the glass itself.
@@ -102,7 +107,7 @@ final class HomeWidgets {
         });
         art.setClipToOutline(true);
         playerCard.setOnFocusChangeListener((v, focused) -> {
-            v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(160).start();
+            focusCard(v, focused);
             // Entering the card always starts on play/pause; leaving it shows no selection.
             if (focused) selected = TOGGLE;
             showSelection(focused);
@@ -111,6 +116,17 @@ final class HomeWidgets {
 
         if (btcOn) newTicker();
         if (playerOn) nowPlaying = new NowPlaying(activity, this::showSession);
+    }
+
+    /**
+     * A card taking or losing focus. Advanced effects: it zooms, and its glass is redrawn every frame of the zoom so
+     * the wallpaper behind it stays in place. Otherwise it does not zoom (a cached layer would show its old backdrop
+     * stretched); the brighter glass fades in instead.
+     */
+    private void focusCard(View v, boolean focused) {
+        if (!advanced) return;   // the background's own cross-fade is the whole animation
+        v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(180)
+                .setUpdateListener(a -> v.invalidate()).start();
     }
 
     private static GradientDrawable flat(float radius, int color, float density) {
