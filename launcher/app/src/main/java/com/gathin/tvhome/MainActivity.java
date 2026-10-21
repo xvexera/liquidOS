@@ -61,7 +61,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.ScrollView;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -117,14 +116,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private WallpaperPlayer wallpaperPlayer;
     /** BTC/USDT and now playing under the clock; see HomeWidgets. */
     private HomeWidgets widgets;
+    /** The light that crosses the focused tile (GlintView), kept on the glass highlight's place and size. */
+    private GlintView glint;
+    /** The dock band; told when the grid scrolls so its glass is moved, not redrawn, meanwhile. */
+    private DockDecoration dockDecoration;
     /** Launcher settings: Liquid Glass pills, dock band and widget cards over a blurred wallpaper. */
     private boolean liquidGlass;
     /** Something Launcher settings asked Home to do once it is back: "reorder" or "dock_edit". */
     private static String pendingSettingsAction;
     /** Extras.revision when this Home was built; a different one in onResume means settings changed. */
     private int settingsRevision;
-    /** The app colour glow's full strength: lower over a wallpaper, so the picture is not tinted by every app. */
+    /** The app colour glow's full strength. */
     private float ambientMax = 1f;
+    /**
+     * A wallpaper (a picture, a built-in one or the rotating one) is behind Home: the app colour glow is off. Over a
+     * picture it only tinted the photo faintly while its colour animation and repaint ran on every focus move.
+     */
+    private boolean glowOff;
     private GlassView glass;
     private View ambient;
     private TextView heroName;
@@ -153,6 +161,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView btnWifi;
     /** The moon pill: night mode's dim and warm panel. */
     private View btnNight;
+    /** The calendar pill and the events behind its count; see CalendarEvents. */
+    private TextView btnCalendar;
+    private CalendarEvents calendarEvents;
+    private List<CalendarEvents.Event> upcoming = new ArrayList<>();
     private TextView shamsiDate;
     private TextView stats;
     private List<RaceWeekend.Race> raceCalendar;
@@ -329,7 +341,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         getWindow().setBackgroundDrawable(null);
         settingsRevision = Extras.revision(this);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
-        if (wallpaperPlayer.current() != null) ambientMax = 0.3f;
+        glowOff = wallpaperPlayer.current() != null || OnlineWallpapers.active(this);
         liquidGlass = Extras.liquidGlass(this);
         if (liquidGlass) {
             int blur = Extras.glassBlur(this);
@@ -346,8 +358,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
+        glint = new GlintView(this);
+        glint.setAlpha(0f);
+        root.addView(glint, root.indexOfChild(glass) + 1, new FrameLayout.LayoutParams(
+                glass.getLayoutParams().width, glass.getLayoutParams().height));
         if (festive) glass.setAccent(festival.accentColor());
         ambient = findViewById(R.id.ambient);
+        if (glowOff) ambient.setVisibility(View.GONE);
         // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
         // a fade renders it into a full-screen offscreen buffer first.
         ambient.forceHasOverlappingRendering(false);
@@ -369,6 +386,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         greetingColor = greeting.getCurrentTextColor();
         btnWifi = findViewById(R.id.btnWifi);
         btnNight = findViewById(R.id.btnNight);
+        btnCalendar = findViewById(R.id.btnCalendar);
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
         raceCalendar = cfg.raceCalendar;
@@ -445,7 +463,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public void onChildViewDetachedFromWindow(@NonNull View v) {
             }
         });
-        if (dockRow) grid.addItemDecoration(new DockDecoration(COLUMNS, density, cinematic, liquidGlass && !cinematic));
+        if (dockRow) {
+            dockDecoration = new DockDecoration(COLUMNS, density, cinematic, liquidGlass && !cinematic);
+            dockDecoration.setAlwaysRefract(advancedEffects);
+            grid.addItemDecoration(dockDecoration);
+        }
         if (animations) {
             int enterAnim = reducedMotion ? R.anim.tile_enter_reduced : R.anim.tile_enter;
             float enterDelay = reducedMotion ? 0f : 0.06f;
@@ -489,11 +511,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // Keep the glass glued to its tile while the grid scrolls.
         grid.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
+            public void onScrollStateChanged(@NonNull RecyclerView rv, int state) {
+                if (dockDecoration != null) dockDecoration.setScrolling(state != RecyclerView.SCROLL_STATE_IDLE, rv);
+            }
+
+            @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
                 if (!glassShown) return;
                 glassTargetY -= dy;
                 glassScrollShift -= dy;
                 glass.setTranslationY(glass.getTranslationY() - dy);
+                glint.setTranslationY(glass.getTranslationY());
             }
         });
 
@@ -510,6 +538,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 v.setTranslationY(value + glassScrollShift);
             }
         });
+        // The light rides on the glass: every spring frame copies its position.
+        springX.addUpdateListener((a, value, velocity) -> glint.setTranslationX(glass.getTranslationX()));
+        springY.addUpdateListener((a, value, velocity) -> glint.setTranslationY(glass.getTranslationY()));
         for (SpringAnimation s : new SpringAnimation[]{springX, springY}) {
             if (reducedMotion) {
                 // Stiff and almost critically damped: settles in a few frames instead of oscillating,
@@ -541,8 +572,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return true;
         });
         if (liquidGlass) {
-            for (View button : new View[]{btnInputs, btnWifi, btnNight, btnReorder, btnSettings}) {
+            for (View button : new View[]{btnInputs, btnWifi, btnCalendar, btnNight, btnReorder, btnSettings}) {
                 button.setBackground(LiquidGlass.pill(density));
+                // Its own small layer: Android replays the whole window every frame of a grid scroll, and without
+                // one the refraction shader of every pill ran again each frame. Redrawn only when the pill changes.
+                button.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             }
         }
 
@@ -553,9 +587,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                // The now playing card sits between the top bar and the dock.
+                // The widgets sit between the top bar and the dock: the player first (it is nearer the pills).
                 if (widgets != null && widgets.playerShown()) {
                     widgets.focusPlayer();
+                    return true;
+                }
+                if (widgets != null && widgets.marketShown()) {
+                    widgets.focusMarket();
                     return true;
                 }
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
@@ -573,11 +611,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         btnSettings.setOnKeyListener(pillKeys);
         btnReorder.setOnKeyListener(pillKeys);
         btnNight.setOnKeyListener(pillKeys);
+        btnCalendar.setOnKeyListener(pillKeys);
+        btnCalendar.setOnClickListener(v -> showCalendarMenu());
+        // Shown only with the switch on and the calendar readable; its count comes in with the first load.
+        if (Extras.calendar(this) && CalendarEvents.allowed(this)) {
+            btnCalendar.setVisibility(View.VISIBLE);
+            calendarEvents = new CalendarEvents(this, 20, events -> {
+                upcoming = events;
+                updateCalendarCount();
+            });
+        }
         btnNight.setOnClickListener(v -> showNightPanel());
         // A night mode left on keeps its overlay across a reboot: Home is the first thing that starts.
         NightLight.apply(this);
         if (advancedEffects) {
-            for (View button : new View[]{btnInputs, btnWifi, btnNight, btnReorder, btnSettings}) {
+            for (View button : new View[]{btnInputs, btnWifi, btnCalendar, btnNight, btnReorder, btnSettings}) {
                 button.setOnFocusChangeListener((view, focused) -> view.animate()
                         .scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f)
                         .setDuration(160).start());
@@ -609,6 +657,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         widgets = new HomeWidgets(this, density, liquidGlass,
                 () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
+        widgets.setOnMarketMenu(this::showMarketMenu);
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
@@ -674,6 +723,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updateInputsButton();
         if (showStats) startStats();
         widgets.start();
+        if (calendarEvents != null) calendarEvents.start();
         refreshOnlineWallpaper(false);
         if (pendingSettingsAction != null) {
             String action = pendingSettingsAction;
@@ -721,6 +771,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (restoreFocus) {
             glassShown = false;
             glass.setAlpha(0f);
+            glint.setAlpha(0f);
             heroShown = false;
             hero.setAlpha(0f);
             ambient.setAlpha(0f);
@@ -795,6 +846,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         handler.removeCallbacks(minuteTick);
         stopStats();
         widgets.stop();
+        if (calendarEvents != null) calendarEvents.stop();
         if (diya != null) diya.stop();
         cancelPendingFocusScroll();
         // Nothing of ours stays on screen over another app; an undecided prompt simply returns next time.
@@ -1227,6 +1279,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             glass.setLayoutParams(lp);
             // GlassView draws its slab inset by pad, i.e. exactly over the zoomed tile: same corners as the tile.
             glass.setRadius(AppAdapter.cornerRadius(card.getWidth(), density) * scale);
+            ViewGroup.LayoutParams glp = glint.getLayoutParams();
+            glp.width = lp.width;
+            glp.height = lp.height;
+            glint.setLayoutParams(glp);
+            glint.setRadius(AppAdapter.cornerRadius(card.getWidth(), density) * scale);
+        }
+        // Which way focus moved, for the side the light comes in from (none on the first focus).
+        boolean moved = glassShown && (Math.abs(x - glassTargetX) > 1 || Math.abs(y - glassTargetY) > 1);
+        float fromX = moved ? Math.signum(x - glassTargetX) : 0f;
+        float fromY = moved ? Math.signum(y - glassTargetY) : 0f;
+        if (moved && fromX != 0 && fromY != 0) {
+            // A move to another row that also shifts sideways: the vertical part is the one the eye follows.
+            fromX = 0f;
         }
         glassCardW = card.getWidth();
         glassTargetX = x;
@@ -1242,18 +1307,28 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             springY.cancel();
             glass.setTranslationX(x);
             glass.setTranslationY(y);
-            if (animations) glass.animate().alpha(1f).setDuration(reducedMotion ? 100 : 180).start();
-            else glass.setAlpha(1f);
+            glint.setTranslationX(x);
+            glint.setTranslationY(y);
+            if (animations) {
+                glass.animate().alpha(1f).setDuration(reducedMotion ? 100 : 180).start();
+                glint.animate().alpha(1f).setDuration(reducedMotion ? 100 : 180).start();
+            } else {
+                glass.setAlpha(1f);
+                glint.setAlpha(1f);
+            }
             glassShown = true;
         } else if (!animations) {
             springX.cancel();
             springY.cancel();
             glass.setTranslationX(x);
             glass.setTranslationY(y);
+            glint.setTranslationX(x);
+            glint.setTranslationY(y);
         } else {
             springX.animateToFinalPosition(x);
             springY.animateToFinalPosition(y - glassScrollShift);
         }
+        glint.sweep(fromX, fromY, animations && !reducedMotion);
         View item = (View) card.getParent();
         if (dockRow && position < COLUMNS) {
             // Dock: park it at the bottom of the screen and show the top shelf for this app.
@@ -1486,6 +1561,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * so changing apps neither repaints it on the CPU (about 11 ms) nor uploads it again.
      */
     private void setAmbient(int color) {
+        if (glowOff) return;
         if (color == ambientColor && ambient.getBackground() != null) return;
         ambientColor = color;
         BitmapDrawable glow = (BitmapDrawable) ambient.getBackground();
@@ -1521,6 +1597,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void transitionAmbient(int color) {
+        if (glowOff) return;
         // A rapid focus change continues from the colour actually displayed on screen.
         stopAmbientAnimation();
         ambient.animate().cancel();
@@ -1593,8 +1670,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (!glassShown) return;
         glassShown = false;
         glass.animate().cancel();
-        if (animations) glass.animate().alpha(0f).setDuration(160).start();
-        else glass.setAlpha(0f);
+        glint.animate().cancel();
+        if (animations) {
+            glass.animate().alpha(0f).setDuration(160).start();
+            glint.animate().alpha(0f).setDuration(160).start();
+        } else {
+            glass.setAlpha(0f);
+            glint.setAlpha(0f);
+        }
     }
 
     // ---- optional system stats (config.xml show_stats) --------------------------------------------
@@ -1797,9 +1880,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (position < COLUMNS) {
-                // dock row: the now playing card when it shows, else let focus move to the top bar
+                // dock row: a widget when one shows (the player, else the market card), else the top bar
                 if (widgets != null && widgets.playerShown()) {
                     widgets.focusPlayer();
+                    return true;
+                }
+                if (widgets != null && widgets.marketShown()) {
+                    widgets.focusMarket();
                     return true;
                 }
                 return false;
@@ -2467,7 +2554,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (name != null) credit.setText(getString(R.string.online_credit, name));
     }
 
+    private String stepperLabel(int minutes) {
+        return "\u2039  " + intervalLabel(minutes) + "  \u203A";
+    }
+
     private String intervalLabel(int minutes) {
+        if (minutes <= 0) return getString(R.string.online_never);
         return minutes >= 1440 ? getString(R.string.online_daily)
                 : minutes >= 60 ? getString(R.string.online_hours, minutes / 60)
                 : getString(R.string.online_minutes, minutes);
@@ -2481,16 +2573,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         toggle.setChecked(on, false);
         ((LinearLayout) row).addView(toggle);
         row.getLayoutParams().height = (int) (48 * density);
-        row.setOnClickListener(v -> {
-            toggle.setChecked(!toggle.isChecked(), true);
-            changed.accept(toggle.isChecked());
-        });
+        if (changed != null) {
+            row.setOnClickListener(v -> {
+                toggle.setChecked(!toggle.isChecked(), true);
+                changed.accept(toggle.isChecked());
+            });
+        }
         return row;
     }
 
     /** Repaints every Liquid Glass surface after the blurred wallpaper behind them changed. */
     private void invalidateGlass() {
-        for (int id : new int[]{R.id.btnInputs, R.id.btnWifi, R.id.btnNight, R.id.btnReorder, R.id.btnSettings}) {
+        for (int id : new int[]{R.id.btnInputs, R.id.btnWifi, R.id.btnCalendar, R.id.btnNight, R.id.btnReorder, R.id.btnSettings}) {
             View v = findViewById(id);
             if (v != null) v.invalidate();
         }
@@ -2527,14 +2621,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** A glass dropdown with a heading under the Settings pill; rows scroll past about eight. */
     private PopupWindow showListMenu(int heading, List<View> items, View focus, Runnable onDismiss) {
-        View anchor = findViewById(R.id.btnSettings);
+        return showListMenu(heading, items, focus, onDismiss, findViewById(R.id.btnSettings),
+                getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
+    }
+
+    private PopupWindow showListMenu(int heading, List<View> items, View focus, Runnable onDismiss, View anchor,
+                                     int gravity) {
         View panel = getLayoutInflater().inflate(R.layout.popup_list, root, false);
         ((TextView) panel.findViewById(R.id.heading)).setText(heading);
         LinearLayout rows = panel.findViewById(R.id.rows);
         for (View item : items) rows.addView(item);
         int width = (int) (280 * density);
         PopupWindow popup = glassPopup(panel, width);
-        int maxRows = (int) (8.5f * 42 * density);
+        // At most about eight rows, and never past the bottom of the screen: a menu hanging from a widget starts
+        // lower than one hanging from the Settings pill.
+        int[] at = new int[2];
+        anchor.getLocationOnScreen(at);
+        int room = getResources().getDisplayMetrics().heightPixels - at[1] - anchor.getHeight() - (int) (80 * density);
+        int maxRows = Math.max((int) (3 * 42 * density), Math.min((int) (8.5f * 42 * density), room));
         rows.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
         if (rows.getMeasuredHeight() > maxRows) {
             ScrollView scroll = panel.findViewById(R.id.scroll);
@@ -2544,7 +2648,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (openPopup == popup) openPopup = null;
             if (onDismiss != null) onDismiss.run();
         });
-        dropIn(popup, panel, anchor, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
+        dropIn(popup, panel, anchor, gravity);
         (focus != null ? focus : items.get(0)).requestFocus();
         return popup;
     }
@@ -2561,9 +2665,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Widgets: each one switched on or off in place; Home rebuilds once the menu closes. */
     private void showWidgetsMenu() {
-        String[] keys = {Extras.BTC_TICKER, Extras.NOW_PLAYING};
-        int[] titles = {R.string.widget_btc, R.string.widget_music};
-        boolean[] values = {Extras.btcTicker(this), Extras.nowPlaying(this)};
+        String[] keys = {Extras.BTC_TICKER, Extras.NOW_PLAYING, Extras.CALENDAR};
+        int[] titles = {R.string.widget_btc, R.string.widget_music, R.string.widget_calendar};
+        boolean[] values = {Extras.btcTicker(this), Extras.nowPlaying(this), Extras.calendar(this)};
         boolean[] changed = {false};
         List<View> items = new ArrayList<>();
         for (int i = 0; i < keys.length; i++) {
@@ -2676,20 +2780,155 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             row.setPaddingRelative(row.getPaddingStart() + indent, 0, row.getPaddingEnd(), 0);
             rows.add(row);
         }
-        View every = menuRow(getString(R.string.online_every), intervalLabel(OnlineWallpapers.intervalMinutes(this)));
+        // A stepper: Left and Right move through the intervals (OK steps forward), shown as "‹ 30 min ›" in the
+        // row's own text size so the change is visible at sofa distance.
+        View every = menuRow(getString(R.string.online_every), "");
         every.setPaddingRelative(every.getPaddingStart() + indent, 0, every.getPaddingEnd(), 0);
-        every.setOnClickListener(v -> {
-            int now = OnlineWallpapers.intervalMinutes(this), next = OnlineWallpapers.INTERVALS[0];
-            for (int i = 0; i < OnlineWallpapers.INTERVALS.length; i++) {
-                if (OnlineWallpapers.INTERVALS[i] == now) {
-                    next = OnlineWallpapers.INTERVALS[(i + 1) % OnlineWallpapers.INTERVALS.length];
-                }
-            }
+        TextView value = every.findViewById(R.id.status);
+        value.setTextSize(15f);
+        value.setTextColor(getColorStateList(R.drawable.pill_text));
+        value.setText(stepperLabel(OnlineWallpapers.intervalMinutes(this)));
+        java.util.function.IntConsumer step = by -> {
+            int[] all = OnlineWallpapers.INTERVALS;
+            int now = OnlineWallpapers.intervalMinutes(this), at = 0;
+            for (int i = 0; i < all.length; i++) if (all[i] == now) at = i;
+            int next = all[(at + by + all.length) % all.length];
             prefs.edit().putInt(OnlineWallpapers.INTERVAL, next).apply();
-            ((TextView) v.findViewById(R.id.status)).setText(intervalLabel(next));
+            value.setText(stepperLabel(next));
+            value.setScaleX(0.85f);
+            value.setScaleY(0.85f);
+            value.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+        };
+        every.setOnClickListener(v -> step.accept(1));
+        every.setOnKeyListener((v, code, event) -> {
+            if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) step.accept(code == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+            return true;
         });
         rows.add(every);
         return rows;
+    }
+
+    /**
+     * OK on the market card: show or hide the line, and pick what it follows, one asset or up to five it rotates
+     * through: crypto pairs from Binance (plus any pair found with Search) or indices and gold from Yahoo Finance.
+     * Hangs under the card; every change shows on the card at once.
+     */
+    private void showMarketMenu() {
+        SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        List<String> picked = new ArrayList<>();
+        for (MarketTicker.Asset a : Extras.marketAssets(this)) picked.add(a.id);
+        List<View> items = new ArrayList<>();
+        items.add(toggleRow(getString(R.string.market_show_chart), Extras.marketChart(this), on -> {
+            prefs.edit().putBoolean(Extras.MARKET_CHART, on).apply();
+            widgets.reloadMarket();
+        }));
+        TextView hint = (TextView) menuHeading(getString(R.string.market_pick_hint, MarketTicker.MAX_PICKED));
+        hint.setAllCaps(false);
+        items.add(hint);
+        // Built-in crypto, then the pairs found with Search, then indices and gold: searched pairs are crypto too.
+        List<MarketTicker.Asset> all = new ArrayList<>();
+        for (MarketTicker.Asset a : MarketTicker.ALL) if (a.source == MarketTicker.Source.BINANCE) all.add(a);
+        all.addAll(MarketTicker.custom(this));
+        for (MarketTicker.Asset a : MarketTicker.ALL) if (a.source != MarketTicker.Source.BINANCE) all.add(a);
+        View focus = null;
+        boolean cryptoDone = false;
+        items.add(menuHeading(getString(R.string.market_crypto)));
+        for (MarketTicker.Asset asset : all) {
+            if (asset.source == MarketTicker.Source.YAHOO && !cryptoDone) {
+                // The search row ends the crypto list; indices and gold follow under their own title.
+                items.add(marketSearchRow(picked));
+                items.add(menuHeading(getString(R.string.market_indices)));
+                cryptoDone = true;
+            }
+            View row = toggleRow(asset.label, picked.contains(asset.id), null);
+            GlassToggle toggle = (GlassToggle) ((LinearLayout) row).getChildAt(((LinearLayout) row).getChildCount() - 1);
+            row.setOnClickListener(v -> {
+                boolean on = !picked.contains(asset.id);
+                if (on && picked.size() >= MarketTicker.MAX_PICKED) {
+                    Toast.makeText(this, getString(R.string.market_max, MarketTicker.MAX_PICKED), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!on && picked.size() == 1) return;   // the card always follows something
+                if (on) picked.add(asset.id);
+                else picked.remove(asset.id);
+                toggle.setChecked(on, true);
+                Extras.setMarketAssets(this, picked);
+                widgets.reloadMarket();
+            });
+            if (focus == null && picked.contains(asset.id)) focus = row;
+            items.add(row);
+        }
+        if (!cryptoDone) items.add(marketSearchRow(picked));
+        showListMenu(R.string.market_widget, items, focus, () -> widgets.focusMarket(), widgets.marketCard(), Gravity.START);
+    }
+
+    /**
+     * "Search pair…": the on-screen keyboard takes a coin ("pepe"), Binance confirms it trades against USDT, and the
+     * pair joins the list and the card.
+     */
+    private View marketSearchRow(List<String> picked) {
+        View row = menuRow(getString(R.string.market_search), "");
+        row.setOnClickListener(v -> {
+            android.widget.EditText input = new android.widget.EditText(this);
+            input.setSingleLine(true);
+            input.setHint(R.string.market_search_hint);
+            input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+            android.app.AlertDialog.Builder dialog = new android.app.AlertDialog.Builder(this)
+                    .setTitle(R.string.market_search)
+                    .setView(input)
+                    .setPositiveButton(R.string.market_add, (d, w) -> {
+                        String typed = input.getText().toString();
+                        new Thread(() -> {
+                            String symbol = MarketTicker.validateBinance(typed);
+                            runOnUiThread(() -> {
+                                if (symbol == null) {
+                                    Toast.makeText(this, getString(R.string.market_not_found, typed.trim()),
+                                            Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                MarketTicker.addCustom(this, symbol);
+                                MarketTicker.Asset asset = MarketTicker.find(this, symbol);
+                                String id = asset != null ? asset.id : symbol;
+                                if (!picked.contains(id)) {
+                                    if (picked.size() >= MarketTicker.MAX_PICKED) picked.remove(0);
+                                    picked.add(id);
+                                }
+                                Extras.setMarketAssets(this, picked);
+                                widgets.reloadMarket();
+                                if (openPopup != null) openPopup.dismiss();
+                                Toast.makeText(this, getString(R.string.market_added,
+                                        asset != null ? asset.label : symbol), Toast.LENGTH_SHORT).show();
+                            });
+                        }, "market-search").start();
+                    })
+                    .setNegativeButton(android.R.string.cancel, null);
+            // When the dialog closes Android hands focus back to whatever tile it finds, which can scroll the dock
+            // off its place: put the dock back and return focus to the market card.
+            dialog.setOnDismissListener(d -> handler.postDelayed(() -> {
+                if (isFinishing()) return;
+                focusTile(lastFocused % COLUMNS);
+                widgets.focusMarket();
+            }, 250));
+            dialog.show();
+        });
+        return row;
+    }
+
+    /** A small section title inside a menu list; not focusable. */
+    private View menuHeading(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setAllCaps(true);
+        t.setTextSize(10f);
+        t.setLetterSpacing(0.16f);
+        t.setTextColor(0x80FFFFFF);
+        t.setTypeface(getResources().getFont(R.font.outfit_medium));
+        int h = (int) (12 * density);
+        t.setPadding(h, (int) (10 * density), h, (int) (4 * density));
+        t.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return t;
     }
 
     /** How many apps the dock (and each grid row) holds: 4 to 7, as in Launcher settings. */
@@ -2712,58 +2951,159 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         showListMenu(R.string.dock_size, items, focus, null);
     }
 
+    // ---- calendar ---------------------------------------------------------------------------------
+
+    /** Events that start within the chosen number of days (or are on now). */
+    private int comingCount() {
+        long until = System.currentTimeMillis() + Extras.calendarDays(this) * 24L * 60 * 60 * 1000;
+        int n = 0;
+        for (CalendarEvents.Event e : upcoming) if (e.begin < until) n++;
+        return n;
+    }
+
+    /**
+     * The pill: the icon alone in its circle when nothing is coming, the icon and the count ("3", "9+") as a
+     * pill when something is.
+     */
+    private void updateCalendarCount() {
+        int n = comingCount();
+        ViewGroup.LayoutParams lp = btnCalendar.getLayoutParams();
+        if (n == 0) {
+            btnCalendar.setText("");
+            lp.width = (int) (42 * density);
+            btnCalendar.setPaddingRelative((int) (10 * density), 0, (int) (10 * density), 0);
+            btnCalendar.setCompoundDrawablePadding(0);
+        } else {
+            btnCalendar.setText(n > 9 ? "9+" : String.valueOf(n));
+            lp.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+            btnCalendar.setPaddingRelative((int) (12 * density), 0, (int) (16 * density), 0);
+            btnCalendar.setCompoundDrawablePadding((int) (7 * density));
+        }
+        btnCalendar.setLayoutParams(lp);
+        btnCalendar.setContentDescription(getString(R.string.calendar_heading) + (n > 0 ? ": " + n : ""));
+    }
+
+    /**
+     * The calendar pill's menu. On top, two day counts: how far ahead the list below reaches, and how near an event
+     * must be to count on the pill. Below, the events in that reach, each with its calendar's colour and when it is;
+     * changing the reach redraws the list in place.
+     */
+    private void showCalendarMenu() {
+        SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        List<View> items = new ArrayList<>();
+        List<View> eventRows = new ArrayList<>();
+        View reach = dayStepper(R.string.calendar_list_days, Extras.CALENDAR_LIST_DAYS, Extras::calendarListDays, () -> {
+            LinearLayout list = (LinearLayout) eventRows.get(0).getParent();
+            int at = list.indexOfChild(eventRows.get(0));
+            for (View old : eventRows) list.removeView(old);
+            eventRows.clear();
+            eventRows.addAll(calendarRows());
+            for (int i = 0; i < eventRows.size(); i++) list.addView(eventRows.get(i), at + i);
+        });
+        items.add(reach);
+        // The pill's count follows when the menu closes: resizing the pill now would move the menu hanging from it.
+        items.add(dayStepper(R.string.calendar_count_days, Extras.CALENDAR_DAYS, Extras::calendarDays, null));
+        eventRows.addAll(calendarRows());
+        items.addAll(eventRows);
+        PopupWindow popup = showListMenu(R.string.calendar_heading, items, null, this::updateCalendarCount, btnCalendar,
+                getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
+        // The event rows are wider than a settings menu: titles and times side by side.
+        popup.update((int) (440 * density), popup.getHeight());
+    }
+
+    /** The events that start within the list's reach (or are on now); "No upcoming events" when there are none. */
+    private List<View> calendarRows() {
+        List<View> rows = new ArrayList<>();
+        long until = System.currentTimeMillis() + Extras.calendarListDays(this) * 24L * 60 * 60 * 1000;
+        for (CalendarEvents.Event e : upcoming) {
+            if (e.begin >= until) continue;
+            View row = menuRow(e.title, CalendarEvents.when(this, e));
+            ImageView dot = row.findViewById(R.id.icon);
+            dot.setVisibility(View.VISIBLE);
+            dot.setImageTintList(null);
+            GradientDrawable round = new GradientDrawable();
+            round.setShape(GradientDrawable.OVAL);
+            round.setColor(e.color | 0xFF000000);
+            int d = (int) (10 * density);
+            round.setSize(d, d);
+            dot.setImageDrawable(round);
+            dot.setScaleType(ImageView.ScaleType.CENTER);
+            ((TextView) row.findViewById(R.id.status)).setTextSize(12f);
+            rows.add(row);
+        }
+        if (rows.isEmpty()) rows.add(menuRow(getString(R.string.calendar_none), ""));
+        return rows;
+    }
+
+    /** A "Title  ‹ 3 days ›" row: Left and Right change it by one day, 1 to 30; OK steps forward. */
+    private View dayStepper(int title, String key, java.util.function.ToIntFunction<Context> current, Runnable after) {
+        SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+        View row = menuRow(getString(title), "");
+        TextView value = row.findViewById(R.id.status);
+        value.setTextSize(15f);
+        value.setTextColor(getColorStateList(R.drawable.pill_text));
+        Runnable show = () -> {
+            int days = current.applyAsInt(this);
+            value.setText("\u2039  " + getResources().getQuantityString(R.plurals.calendar_days, days, days) + "  \u203A");
+        };
+        show.run();
+        java.util.function.IntConsumer step = by -> {
+            int next = Math.max(1, Math.min(Extras.CALENDAR_MAX_DAYS, current.applyAsInt(this) + by));
+            prefs.edit().putInt(key, next).apply();
+            show.run();
+            if (after != null) after.run();
+        };
+        row.setOnClickListener(v -> step.accept(1));
+        row.setOnKeyListener((v, code, event) -> {
+            if (code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+            if (event.getAction() == KeyEvent.ACTION_DOWN) step.accept(code == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+            return true;
+        });
+        return row;
+    }
+
     // ---- night mode -------------------------------------------------------------------------------
 
-    /** The moon pill's panel: night mode on or off, and the dim and warm sliders, applied as they move. */
+    /** The moon pill's panel: night mode on or off, and the dim and warm bars, applied as they move. */
     private void showNightPanel() {
         View panel = getLayoutInflater().inflate(R.layout.popup_night, root, false);
-        PopupWindow popup = glassPopup(panel, (int) (300 * density));
-        TextView toggle = panel.findViewById(R.id.nightToggle);
-        SeekBar dim = panel.findViewById(R.id.nightDim);
-        SeekBar warm = panel.findViewById(R.id.nightWarm);
-        TextView dimLabel = panel.findViewById(R.id.nightDimLabel);
-        TextView warmLabel = panel.findViewById(R.id.nightWarmLabel);
+        PopupWindow popup = glassPopup(panel, (int) (380 * density));
+        GlassSlider dim = panel.findViewById(R.id.nightDim);
+        GlassSlider warm = panel.findViewById(R.id.nightWarm);
+        dim.setIcon(R.drawable.ic_brightness);
+        warm.setIcon(R.drawable.ic_warm);
         dim.setMax(NightLight.MAX_DIM);
-        dim.setProgress(NightLight.dim(this));
-        warm.setProgress(NightLight.warm(this));
-        dim.setKeyProgressIncrement(5);
-        warm.setKeyProgressIncrement(5);
+        dim.setValue(NightLight.dim(this));
+        warm.setValue(NightLight.warm(this));
         boolean[] on = {NightLight.on(this)};
-        Runnable refresh = () -> {
-            toggle.setText(getString(R.string.night_mode_state, getString(on[0] ? R.string.on : R.string.off)));
-            dimLabel.setText(getString(R.string.night_dim_level, dim.getProgress()));
-            warmLabel.setText(getString(R.string.night_warm_level, warm.getProgress()));
-        };
+        // The on/off row: the same glass switch as the widget menus, with the moon in front.
+        View toggle = toggleRow(getString(R.string.night_mode), on[0], value -> {
+            on[0] = value;
+            NightLight.set(this, value, dim.getValue(), warm.getValue());
+        });
+        ImageView moon = toggle.findViewById(R.id.icon);
+        moon.setVisibility(View.VISIBLE);
+        moon.setImageResource(R.drawable.ic_moon);
+        GlassToggle onSwitch = (GlassToggle) ((LinearLayout) toggle).getChildAt(((LinearLayout) toggle).getChildCount() - 1);
+        LinearLayout panelRows = (LinearLayout) panel;
+        View oldToggle = panel.findViewById(R.id.nightToggle);
+        panelRows.addView(toggle, panelRows.indexOfChild(oldToggle));
+        panelRows.removeView(oldToggle);
         if (!NightLight.canDraw(this)) {
             TextView hint = panel.findViewById(R.id.nightHint);
             hint.setText(R.string.night_needs_permission);
             hint.setVisibility(View.VISIBLE);
         }
-        toggle.setOnClickListener(v -> {
-            on[0] = !on[0];
-            NightLight.set(this, on[0], dim.getProgress(), warm.getProgress());
-            refresh.run();
-        });
-        SeekBar.OnSeekBarChangeListener moved = new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                if (!fromUser) return;
-                on[0] = true;   // moving a slider means "use it"
-                NightLight.set(MainActivity.this, true, dim.getProgress(), warm.getProgress());
-                refresh.run();
+        GlassSlider.OnChange moved = value -> {
+            // Moving a bar means "use it": the switch turns on with it.
+            if (!on[0]) {
+                on[0] = true;
+                onSwitch.setChecked(true, true);
             }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {
-            }
+            NightLight.set(this, true, dim.getValue(), warm.getValue());
         };
-        dim.setOnSeekBarChangeListener(moved);
-        warm.setOnSeekBarChangeListener(moved);
-        refresh.run();
+        dim.setOnChange(moved);
+        warm.setOnChange(moved);
         dropIn(popup, panel, btnNight, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
         toggle.requestFocus();
     }

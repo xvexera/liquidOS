@@ -15,6 +15,16 @@
     <!-- Night mode: the dim and warm overlay over every app (granted over adb, see NightLight), kept up by a
          foreground service while an app is in front. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- The calendar widget: the next events of the calendars the TV already syncs from the Google account
+         (granted over adb, see CalendarEvents). Read only; nothing leaves the TV. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Launcher settings choose the screensaver and its delay (Google TV has no picker of its own). Both granted over
+         adb: pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS, and
+         appops set com.gathin.tvhome WRITE_SETTINGS allow. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Needed since Android 10 to read the Wi-Fi network name for the network pill. Never requested at

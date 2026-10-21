@@ -32,11 +32,20 @@ final class HomeWidgets {
     private final View row;
     private final View btcCard;
     private final View playerCard;
+    private final float density;
     private final boolean btcOn;
     private final boolean playerOn;
     private final Runnable focusDock;
     private final Runnable focusTopBar;
-    private CryptoTicker ticker;
+    /** OK on the market card: Home opens its menu (asset and chart). */
+    private Runnable onMarketMenu;
+    private MarketTicker ticker;
+    private java.util.List<MarketTicker.Asset> assets;
+    /** Which of the picked assets is on the card. */
+    private int shown;
+    private boolean active;
+    private static final long ROTATE_MS = 8000;
+    private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
     private NowPlaying nowPlaying;
     private boolean okDown;
     private boolean okHandled;
@@ -55,19 +64,33 @@ final class HomeWidgets {
         row = activity.findViewById(R.id.widgets);
         btcCard = activity.findViewById(R.id.btcCard);
         playerCard = activity.findViewById(R.id.playerCard);
+        this.density = density;
         btcOn = row != null && Extras.btcTicker(activity);
         playerOn = row != null && Extras.nowPlaying(activity);
         if (row == null) return;
 
         float radius = 22 * density;
-        btcCard.setBackground(liquidGlass ? LiquidGlass.surface(radius, density) : flat(radius, 0x33FFFFFF, density));
-        if (liquidGlass) {
-            playerCard.setBackground(LiquidGlass.focusableSurface(radius, density));
-        } else {
-            StateListDrawable d = new StateListDrawable();
-            d.addState(new int[]{android.R.attr.state_focused}, flat(radius, 0x66FFFFFF, density));
-            d.addState(new int[0], flat(radius, 0x33FFFFFF, density));
-            playerCard.setBackground(d);
+        // Both cards take focus: the same brighter glass while focused.
+        for (View card : new View[]{btcCard, playerCard}) {
+            if (liquidGlass) {
+                card.setBackground(LiquidGlass.widgetCard(radius, density));
+                // Cached as a layer, like the pills: the glass shader runs when the card changes, not every frame.
+                card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            } else {
+                StateListDrawable d = new StateListDrawable();
+                d.addState(new int[]{android.R.attr.state_focused}, flat(radius, 0x66FFFFFF, density));
+                d.addState(new int[0], flat(radius, 0x33FFFFFF, density));
+                card.setBackground(d);
+            }
+        }
+        btcCard.setOnFocusChangeListener((v, focused) ->
+                v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(160).start());
+        btcCard.setOnKeyListener((v, keyCode, event) -> onMarketKey(keyCode, event));
+        // A soft shadow under the widgets' text, so green and red figures stay legible over a bright wallpaper
+        // without darkening the glass itself.
+        for (int id : new int[]{R.id.btcPair, R.id.btcPrice, R.id.btcChange, R.id.playerKicker, R.id.playerTitle,
+                R.id.playerArtist}) {
+            ((TextView) activity.findViewById(id)).setShadowLayer(4 * density, 0, density, 0xCC000000);
         }
         ImageView art = activity.findViewById(R.id.playerArt);
         float artRadius = 12 * density;
@@ -86,11 +109,7 @@ final class HomeWidgets {
         });
         playerCard.setOnKeyListener((v, keyCode, event) -> onPlayerKey(keyCode, event));
 
-        if (btcOn) {
-            ticker = new CryptoTicker(this::showQuote);
-            CryptoTicker.Quote last = CryptoTicker.last();
-            if (last != null) showQuote(last);
-        }
+        if (btcOn) newTicker();
         if (playerOn) nowPlaying = new NowPlaying(activity, this::showSession);
     }
 
@@ -102,15 +121,130 @@ final class HomeWidgets {
         return d;
     }
 
+    void setOnMarketMenu(Runnable action) {
+        onMarketMenu = action;
+    }
+
+    View marketCard() {
+        return btcCard;
+    }
+
+    boolean marketShown() {
+        return btcCard != null && btcCard.getVisibility() == View.VISIBLE;
+    }
+
+    void focusMarket() {
+        if (marketShown()) btcCard.requestFocus();
+    }
+
+    /** The assets or the chart setting changed: show the first at once (its last price if known) and fetch them. */
+    void reloadMarket() {
+        if (!btcOn) return;
+        boolean running = ticker != null && active;
+        if (ticker != null) ticker.stop();
+        main.removeCallbacks(rotate);
+        newTicker();
+        if (running) startMarket();
+    }
+
+    private void newTicker() {
+        assets = Extras.marketAssets(activity);
+        shown = 0;
+        ticker = new MarketTicker(assets, this::onQuote);
+        showAsset(assets.get(0), false);
+    }
+
+    private void startMarket() {
+        ticker.start();
+        if (assets.size() > 1) main.postDelayed(rotate, ROTATE_MS);
+    }
+
+    /** Several picked assets: every few seconds the card fades to the next one. */
+    private final Runnable rotate = new Runnable() {
+        @Override
+        public void run() {
+            if (!active || assets.size() < 2) return;
+            shown = (shown + 1) % assets.size();
+            showAsset(assets.get(shown), true);
+            main.postDelayed(this, ROTATE_MS);
+        }
+    };
+
+    private void onQuote(MarketTicker.Quote q) {
+        if (assets.get(shown).id.equals(q.asset.id)) showQuote(q);
+    }
+
+    /** Puts {@code asset} on the card: its badge and name, and its last price, or a dash until one arrives. */
+    private void showAsset(MarketTicker.Asset asset, boolean fade) {
+        android.view.ViewGroup card = (android.view.ViewGroup) btcCard;
+        View content = card.getChildAt(0), spark = card.getChildAt(1);
+        Runnable swap = () -> {
+            TextView badge = activity.findViewById(R.id.btcBadge);
+            badge.setText(asset.badge);
+            badge.setTextSize(asset.badge.length() > 1 ? 8f : 11f);
+            badge.getBackground().mutate().setTint(asset.badgeColor);
+            ((TextView) activity.findViewById(R.id.btcPair)).setText(asset.label);
+            MarketTicker.Quote last = MarketTicker.last(asset);
+            if (last != null) {
+                showQuote(last);
+            } else {
+                ((TextView) activity.findViewById(R.id.btcPrice)).setText("\u2014");
+                ((TextView) activity.findViewById(R.id.btcChange)).setText("");
+                spark.setVisibility(View.GONE);
+            }
+        };
+        if (!fade) {
+            swap.run();
+            return;
+        }
+        for (View v : new View[]{content, spark}) v.animate().cancel();
+        content.animate().alpha(0f).translationY(-6 * activity.getResources().getDisplayMetrics().density)
+                .setDuration(180).withEndAction(() -> {
+                    swap.run();
+                    content.setTranslationY(6 * activity.getResources().getDisplayMetrics().density);
+                    content.animate().alpha(1f).translationY(0f).setDuration(220).start();
+                    spark.setAlpha(0f);
+                    spark.animate().alpha(1f).setDuration(260).start();
+                }).start();
+        spark.animate().alpha(0f).setDuration(180).start();
+    }
+
+    /** OK opens the market menu; Right goes to the player, Down to the dock, Up to the top bar. */
+    private boolean onMarketKey(int keyCode, KeyEvent event) {
+        boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+                if (!down && onMarketMenu != null) onMarketMenu.run();
+                return true;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                if (down && playerShown()) playerCard.requestFocus();
+                return true;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+                return true;
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                if (down) focusDock.run();
+                return true;
+            case KeyEvent.KEYCODE_DPAD_UP:
+                if (down) focusTopBar.run();
+                return true;
+            default:
+                return false;
+        }
+    }
+
     void start() {
         if (row == null) return;
         btcCard.setVisibility(btcOn ? View.VISIBLE : View.GONE);
-        if (ticker != null) ticker.start();
+        active = true;
+        if (ticker != null) startMarket();
         if (nowPlaying != null) nowPlaying.start();
         updateRow();
     }
 
     void stop() {
+        active = false;
+        main.removeCallbacks(rotate);
         if (ticker != null) ticker.stop();
         if (nowPlaying != null) nowPlaying.stop();
     }
@@ -135,20 +269,27 @@ final class HomeWidgets {
         row.setVisibility(any ? View.VISIBLE : View.GONE);
     }
 
-    // ---- BTC ---------------------------------------------------------------------------------------
+    // ---- Market ------------------------------------------------------------------------------------
 
-    private void showQuote(CryptoTicker.Quote q) {
-        NumberFormat money = NumberFormat.getCurrencyInstance(Locale.US);
-        money.setMaximumFractionDigits(q.price >= 1000 ? 0 : 2);
-        ((TextView) activity.findViewById(R.id.btcPrice)).setText(money.format(q.price));
-        ((TextView) activity.findViewById(R.id.btcPair)).setText(q.pair);
+    private void showQuote(MarketTicker.Quote q) {
+        NumberFormat number = q.asset.dollars ? NumberFormat.getCurrencyInstance(Locale.US)
+                : NumberFormat.getNumberInstance(Locale.US);
+        // Thousands without cents; coins under a cent (SHIB, PEPE) with enough decimals to move.
+        int decimals = q.price >= 1000 ? (q.asset.dollars ? 0 : 2) : q.price >= 1 ? 2 : q.price >= 0.01 ? 4 : 8;
+        number.setMinimumFractionDigits(q.asset.dollars ? Math.min(decimals, 2) : decimals);
+        number.setMaximumFractionDigits(decimals);
+        ((TextView) activity.findViewById(R.id.btcPrice)).setText(number.format(q.price));
         boolean up = q.changePercent >= 0;
         TextView change = activity.findViewById(R.id.btcChange);
-        change.setText(String.format(Locale.US, "%s %.2f%%  ·  24 h", up ? "▲" : "▼", Math.abs(q.changePercent)));
+        String period = activity.getString(q.asset.source == MarketTicker.Source.BINANCE
+                ? R.string.market_period_24h : R.string.market_period_today);
+        change.setText(String.format(Locale.US, "%s %.2f%%  \u00B7  %s", up ? "\u25B2" : "\u25BC",
+                Math.abs(q.changePercent), period));
         change.setTextColor(up ? UP_COLOR : DOWN_COLOR);
         SparklineView spark = activity.findViewById(R.id.btcSpark);
-        spark.setVisibility(q.history != null ? View.VISIBLE : View.GONE);
-        if (q.history != null) spark.setValues(q.history, up ? UP_COLOR : DOWN_COLOR);
+        boolean chart = q.history != null && Extras.marketChart(activity);
+        spark.setVisibility(chart ? View.VISIBLE : View.GONE);
+        if (chart) spark.setValues(q.history, up ? UP_COLOR : DOWN_COLOR);
     }
 
     // ---- Now playing -------------------------------------------------------------------------------
@@ -257,6 +398,10 @@ final class HomeWidgets {
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (down) {
                     int next = selected + (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+                    if (next < PREV && marketShown()) {
+                        btcCard.requestFocus();
+                        return true;
+                    }
                     if (next >= PREV && next <= NEXT) {
                         selected = next;
                         showSelection(true);

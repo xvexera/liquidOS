@@ -198,6 +198,9 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private final Map<String, String> appLabels, appBanners;
     private final List<Entry> items = new ArrayList<>();
 
+    /** Extras.iconPack: "stock", "mono" or "minimal". */
+    private final String iconPack;
+
     AppAdapter(Context ctx, TileListener listener, int dockSize, Config cfg) {
         this.ctx = ctx;
         this.listener = listener;
@@ -211,6 +214,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         this.showLibrary = cfg.appLibrary;
         this.reducedMotion = cfg.reducedMotion;
         this.rowsBelowDock = cfg.rowsBelowDock;
+        this.iconPack = Extras.iconPack(ctx);
         this.dockTitle = cfg.dockTitle;
         this.dockRow = cfg.dockRow;
         this.cinematic = cfg.cinematicHome;
@@ -409,7 +413,19 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         // A fully opaque banner covers the whole card (centerCrop), so the card's own fill under it is drawn for
         // nothing on every frame; keep it under banners with transparent parts and under icon tiles.
         h.card.setBackground(e.banner != null && e.banner.getOpacity() == PixelFormat.OPAQUE ? null : h.cardBackground);
-        if (e.banner != null) {
+        h.banner.setColorFilter(iconPack.equals("mono") ? mono() : null);
+        h.icon.setColorFilter(iconPack.equals("mono") ? mono() : null);
+        styleLabel(h, iconPack.equals("minimal"));
+        if (iconPack.equals("minimal")) {
+            // Minimal: no artwork at all, the app's name in white on a dark tile.
+            h.card.setBackground(minimalTile());
+            h.banner.setImageDrawable(null);
+            h.banner.setVisibility(View.GONE);
+            h.icon.setImageDrawable(null);
+            h.icon.setVisibility(View.GONE);
+            h.label.setText(e.label);
+            h.label.setVisibility(View.VISIBLE);
+        } else if (e.banner != null) {
             h.banner.setImageDrawable(e.banner);
             h.banner.setVisibility(View.VISIBLE);
             h.icon.setVisibility(View.GONE);
@@ -432,6 +448,49 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             }
             return true;
         });
+    }
+
+    /** Black and white: the luminance of each pixel, for the "mono" icon pack. Made on first use. */
+    private android.graphics.ColorMatrixColorFilter mono;
+
+    private android.graphics.ColorMatrixColorFilter mono() {
+        if (mono == null) {
+            android.graphics.ColorMatrix m = new android.graphics.ColorMatrix();
+            m.setSaturation(0f);
+            mono = new android.graphics.ColorMatrixColorFilter(m);
+        }
+        return mono;
+    }
+
+    private android.graphics.drawable.Drawable minimalTile;
+
+    /** The minimal pack's tile: near-black glass with a faint rim, the corners of the stock tile. */
+    private android.graphics.drawable.Drawable minimalTile() {
+        if (minimalTile == null) {
+            float d = ctx.getResources().getDisplayMetrics().density;
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFF1E1E22, 0xFF121214});
+            g.setCornerRadius(cornerRadius((int) (180 * d), d));
+            g.setStroke(Math.max(1, Math.round(d)), 0x2EFFFFFF);
+            minimalTile = g;
+        }
+        return minimalTile;
+    }
+
+    /** The label under an icon tile, or (minimal pack) large and centred as the whole tile. */
+    private void styleLabel(Holder h, boolean minimal) {
+        float d = ctx.getResources().getDisplayMetrics().density;
+        android.widget.FrameLayout.LayoutParams lp = (android.widget.FrameLayout.LayoutParams) h.label.getLayoutParams();
+        int gravity = minimal ? android.view.Gravity.CENTER : android.view.Gravity.BOTTOM;
+        if (lp.gravity != gravity) {
+            lp.gravity = gravity;
+            h.label.setLayoutParams(lp);
+        }
+        h.label.setTextSize(minimal ? 19f : 13f);
+        h.label.setLetterSpacing(minimal ? 0.03f : 0f);
+        h.label.setTypeface(ctx.getResources().getFont(minimal ? R.font.outfit_medium : R.font.outfit));
+        int pad = Math.round(10 * d);
+        h.label.setPadding(pad, 0, pad, minimal ? 0 : Math.round(8 * d));
     }
 
     /** Opens the tile's activity by explicit component, with no extras: a card can name nothing else. */

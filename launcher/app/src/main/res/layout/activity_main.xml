@@ -317,7 +317,8 @@
                     android:paddingEnd="18dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:focusable="false"
+                    android:focusable="true"
+                    android:clickable="true"
                     android:visibility="gone">
 
                     <LinearLayout
@@ -332,6 +333,7 @@
                             android:orientation="horizontal">
 
                             <TextView
+                                android:id="@+id/btcBadge"
                                 android:layout_width="16dp"
                                 android:layout_height="16dp"
                                 android:background="@drawable/btc_badge"
@@ -359,7 +361,6 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:minWidth="128dp"
                             android:singleLine="true"
                             android:text="—"
                             android:textColor="#FFFFFFFF"
@@ -382,7 +383,7 @@
                         android:id="@+id/btcSpark"
                         android:layout_width="96dp"
                         android:layout_height="40dp"
-                        android:layout_marginStart="16dp" />
+                        android:layout_marginStart="12dp" />
                 </LinearLayout>
 
                 <!-- Left and Right choose previous, play/pause or next; OK presses it; a long OK opens the app. -->
@@ -512,6 +513,16 @@
                     android:text="@string/wifi"
                     android:drawableStart="@drawable/ic_wifi"
                     android:nextFocusDown="@+id/grid" />
+
+                <!-- Calendar: the next events of the TV's synced Google calendars; the count of the coming days next to
+                     the icon. See CalendarEvents. -->
+                <TextView
+                    android:id="@+id/btnCalendar"
+                    style="@style/TopButtonIcon"
+                    android:contentDescription="@string/calendar_heading"
+                    android:drawableStart="@drawable/ic_calendar"
+                    android:nextFocusDown="@+id/grid"
+                    android:visibility="gone" />
 
                 <!-- Night mode: dim and warm filter over every app; see NightLight. -->
                 <TextView

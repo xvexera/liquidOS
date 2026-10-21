@@ -47,7 +47,8 @@ final class OnlineWallpapers {
     private static final String LAST_FETCH = "online_last_fetch";
     private static final String CREDIT = "online_credit";
     private static final String RECENT = "online_recent";
-    static final int[] INTERVALS = {15, 30, 60, 180, 1440};
+    /** Minutes between pictures; 0 never rotates by itself, only with Change wallpaper now. */
+    static final int[] INTERVALS = {0, 15, 30, 60, 180, 1440};
 
     private static final String API = "https://commons.wikimedia.org/w/api.php";
     /** Wikimedia asks every API client to say who it is. */
@@ -71,6 +72,7 @@ final class OnlineWallpapers {
             {"flowers", "Featured pictures of flowers"},
     };
 
+    private static final String TAG = "TvHome.Wallpaper";
     private static final ExecutorService worker = Executors.newSingleThreadExecutor();
     private static volatile boolean fetching;
 
@@ -130,7 +132,9 @@ final class OnlineWallpapers {
 
     static boolean due(Context ctx) {
         long last = prefs(ctx).getLong(LAST_FETCH, 0);
-        return current(ctx) == null || System.currentTimeMillis() - last >= intervalMinutes(ctx) * 60_000L;
+        if (current(ctx) == null) return true;
+        int minutes = intervalMinutes(ctx);
+        return minutes > 0 && System.currentTimeMillis() - last >= minutes * 60_000L;
     }
 
     /**
@@ -198,8 +202,9 @@ final class OnlineWallpapers {
             File result = null;
             try {
                 result = download(ctx, cats.get(new Random().nextInt(cats.size())));
-            } catch (Exception ignored) {
+            } catch (Exception failed) {
                 // offline or Commons busy: keep the picture we have and try at the next rotation
+                android.util.Log.w(TAG, "Rotation skipped: " + failed);
             } finally {
                 fetching = false;
             }
@@ -261,6 +266,7 @@ final class OnlineWallpapers {
         prefs(ctx).edit().putLong(LAST_FETCH, System.currentTimeMillis())
                 .putString(CREDIT, credit.isEmpty() ? "Wikimedia Commons" : credit)
                 .putString(RECENT, String.join("\n", recent)).apply();
+        android.util.Log.i(TAG, "New wallpaper from " + category + " (every " + intervalMinutes(ctx) + " min)");
         return target;
     }
 

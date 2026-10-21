@@ -46,7 +46,11 @@ final class LiquidGlass {
         backdrop = null;
         generation++;
         if (wallpaper == null || wallpaper.isRecycled() || screenW <= 0 || screenH <= 0) return;
-        int factor = blurLevel == Extras.BLUR_SOFT ? 10 : blurLevel == Extras.BLUR_STRONG ? 32 : 18;
+        // blurLevel is 0 to 100: the wallpaper is shrunk 2 to 36 times before the box blur and the stretch back. At 0 it
+        // is kept at half the screen and not blurred at all, so the glass shows the picture nearly sharp and the rim
+        // bends the real image, the clear tvOS look; it costs a 2 MB bitmap instead of a few kilobytes.
+        int percent = Math.max(0, Math.min(100, blurLevel));
+        int factor = 2 + Math.round(percent * 0.34f);
         int w = Math.max(4, screenW / factor), h = Math.max(4, screenH / factor);
         try {
             Bitmap small = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -58,12 +62,17 @@ final class LiquidGlass {
             Paint p = new Paint(Paint.FILTER_BITMAP_FLAG);
             c.drawBitmap(wallpaper, m, p);
             if (dimPercent > 0) c.drawColor((Math.min(90, dimPercent) * 255 / 100) << 24);
-            boxBlur(small, blurLevel == Extras.BLUR_STRONG ? 2 : 1);
+            if (percent >= 10) boxBlur(small, percent >= 70 ? 2 : 1);
             backdrop = small;
             backdropScale = factor;
         } catch (OutOfMemoryError ignored) {
             backdrop = null;
         }
+    }
+
+    /** The small blurred copy of the wallpaper, or null: Launcher settings stretches it as its backdrop. */
+    static Bitmap backdrop() {
+        return backdrop;
     }
 
     static int generation() {
@@ -98,8 +107,8 @@ final class LiquidGlass {
             + "  float2 n = g / max(length(g), 0.0001);\n"
             + "  float k = edge * edge;\n"
             + "  float2 off = -n * strength * k;\n"
-            + "  half3 col = half3(backdrop.eval(c + off * 1.12).r, backdrop.eval(c + off).g,\n"
-            + "                    backdrop.eval(c + off * 0.88).b);\n"
+            + "  half3 col = half3(backdrop.eval(c + off * 1.04).r, backdrop.eval(c + off).g,\n"
+            + "                    backdrop.eval(c + off * 0.96).b);\n"
             + "  col = mix(col, col * 1.10 + 0.025, k);\n"
             + "  float light = max(dot(n, normalize(float2(-0.45, -1.0))), 0.0);\n"
             + "  col += half(pow(edge, 5.0) * light * 0.55);\n"
@@ -162,11 +171,26 @@ final class LiquidGlass {
         return s;
     }
 
-    /** Resting glass, a brighter glass while focused: the now playing card. */
+    /** Resting glass, a brighter glass while focused. */
     static Drawable focusableSurface(float radiusPx, float density) {
         StateListDrawable d = new StateListDrawable();
         d.addState(new int[]{android.R.attr.state_focused}, new Surface(radiusPx, density, true));
         d.addState(new int[0], new Surface(radiusPx, density, false));
+        return d;
+    }
+
+    /**
+     * The widget cards: focusable glass under a light dark veil, lighter than a menu's, so small coloured figures
+     * (a green +2.4%) stay legible over a bright sky while the card still reads as the same glass as the pills.
+     */
+    static Drawable widgetCard(float radiusPx, float density) {
+        StateListDrawable d = new StateListDrawable();
+        for (boolean focused : new boolean[]{true, false}) {
+            Surface s = new Surface(radiusPx, density, focused);
+            s.veil = true;
+            s.veilColor = focused ? 0x330A0A0E : 0x470A0A0E;
+            d.addState(focused ? new int[]{android.R.attr.state_focused} : new int[0], s);
+        }
         return d;
     }
 
@@ -192,6 +216,14 @@ final class LiquidGlass {
      * the dock band, which DockDecoration draws straight onto the grid's canvas.
      */
     static void draw(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean bright) {
+        draw(canvas, rect, radius, host, p, bright, true);
+    }
+
+    /**
+     * {@code refract} false draws the plain blur only: a single textured round rect, cheap enough for every frame of
+     * a scroll, and still sampled where the surface is on screen at that frame.
+     */
+    static void draw(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean bright, boolean refract) {
         Bitmap bg = backdrop;
         if (bg != null && host != null) {
             if (p.shaderBitmap != bg) {
@@ -209,7 +241,7 @@ final class LiquidGlass {
             p.matrix.setScale(backdropScale, backdropScale);
             p.matrix.postTranslate(-p.loc[0], -p.loc[1]);
             p.shader.setLocalMatrix(p.matrix);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && p.refraction != null
+            if (refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && p.refraction != null
                     && canvas.isHardwareAccelerated()) {
                 RuntimeShader r = (RuntimeShader) p.refraction;
                 r.setInputShader("backdrop", p.shader);
@@ -282,8 +314,9 @@ final class LiquidGlass {
         private final Paints paints;
         private final RectF rect = new RectF();
         private final float inset;
-        /** panel(): a dark layer between the glass and the menu's rows. */
+        /** panel() and widgetCard(): a dark layer between the glass and what sits on it. */
         boolean veil;
+        int veilColor = 0x6B0A0A0E;
         private final Paint veilPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         Surface(float radius, float density, boolean bright) {
@@ -306,7 +339,7 @@ final class LiquidGlass {
             }
             LiquidGlass.draw(canvas, rect, radius, cb instanceof View ? (View) cb : null, paints, bright);
             if (veil && backdrop != null) {
-                veilPaint.setColor(0x6B0A0A0E);
+                veilPaint.setColor(veilColor);
                 canvas.drawRoundRect(rect, radius, radius, veilPaint);
             }
         }
