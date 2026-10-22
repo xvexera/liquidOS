@@ -15,8 +15,8 @@ final class NightLight {
     static final String ON = "night_on";
     static final String DIM = "night_dim";
     static final String WARM = "night_warm";
-    /** Darkest the dim slider goes: past this the picture is hard to find again with the remote. */
-    static final int MAX_DIM = 90;
+    /** The dim slider goes to 100%; color() keeps a trace of the picture even there. */
+    static final int MAX_DIM = 100;
     /** Candle-like amber, about 1900 K. */
     private static final int WARM_RGB = 0xFF9329;
     /** Strongest warm filter, as alpha; more turns the picture orange rather than warm. */
@@ -74,7 +74,8 @@ final class NightLight {
      */
     static int color(int dimPercent, int warmPercent) {
         float aw = warmPercent / 100f * MAX_WARM_ALPHA;
-        float ad = dimPercent / 100f;
+        // 100% is as dark as the layer gets, short of black: a trace of the picture stays to find the moon again.
+        float ad = dimPercent / 100f * 0.97f;
         float a = 1f - (1f - aw) * (1f - ad);
         if (a <= 0f) return 0;
         float scale = aw * (1f - ad) / a;   // un-premultiply the amber left after the dim layer

@@ -45,7 +45,15 @@ final class WallpaperChoices {
         // A theme with a single wallpaper.jpg offers that picture too (Config maps the choice back to it).
         File single = dir == null ? null : new File(dir, Config.WALLPAPER_NAME);
         if (single != null && single.isFile()) images.add(0, single);
-        for (File image : images) list.add(new Choice(image.getName(), prettyName(image.getName()), image));
+        for (File image : images) {
+            // An upload from the phone is named by when it came, short enough for a menu row: "Photo · 22 Oct 15:30".
+            String label = image.getName().startsWith(PhoneUpload.PREFIX)
+                    ? ctx.getString(R.string.wallpaper_upload_label, android.text.format.DateFormat.format(
+                    android.text.format.DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), "dMMMjmm"),
+                    image.lastModified()))
+                    : prettyName(image.getName());
+            list.add(new Choice(image.getName(), label, image));
+        }
         list.add(new Choice(NONE, ctx.getString(R.string.wallpaper_icon), null));
         list.add(new Choice(OLED, ctx.getString(R.string.wallpaper_oled), null));
         return list;
@@ -56,9 +64,12 @@ final class WallpaperChoices {
         return id != 0 ? ctx.getString(id) : name;
     }
 
+    /** Pictures whose file name starts with one of these sit in their own folder of the wallpaper menu. */
+    static final String NASA = "nasa_", RETRO = "retro_";
+
     /** "nasa_pillars_of_creation.jpg" reads as "Pillars of creation" in a menu. */
     static String prettyName(String file) {
-        String base = file.replaceFirst("\\.[A-Za-z0-9]+$", "").replaceFirst("^nasa[_-]", "").replace('_', ' ').replace('-', ' ').trim();
+        String base = file.replaceFirst("\\.[A-Za-z0-9]+$", "").replaceFirst("^(?i)(nasa|retro)[_-]", "").replace('_', ' ').replace('-', ' ').trim();
         return base.isEmpty() ? file : Character.toUpperCase(base.charAt(0)) + base.substring(1);
     }
 

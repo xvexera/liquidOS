@@ -515,14 +515,22 @@
                     android:drawableStart="@drawable/ic_swap_vert"
                     android:nextFocusDown="@+id/grid" />
 
+                <!-- Network: the icon alone, Wi-Fi (or Ethernet) when online and crossed out when not; a VPN badge widens
+                     it into a pill. -->
                 <TextView
                     android:id="@+id/btnWifi"
-                    style="@style/TopButton"
-                    android:maxWidth="180dp"
+                    style="@style/TopButtonIcon"
                     android:singleLine="true"
-                    android:ellipsize="end"
-                    android:text="@string/wifi"
+                    android:contentDescription="@string/wifi"
                     android:drawableStart="@drawable/ic_wifi"
+                    android:nextFocusDown="@+id/grid" />
+
+                <!-- Night mode: dim and warm filter over every app; see NightLight. -->
+                <TextView
+                    android:id="@+id/btnNight"
+                    style="@style/TopButtonIcon"
+                    android:contentDescription="@string/night_mode"
+                    android:drawableStart="@drawable/ic_moon"
                     android:nextFocusDown="@+id/grid" />
 
                 <!-- Calendar: the next events of the TV's synced Google calendars; the count of the coming days next to
@@ -534,14 +542,6 @@
                     android:drawableStart="@drawable/ic_calendar"
                     android:nextFocusDown="@+id/grid"
                     android:visibility="gone" />
-
-                <!-- Night mode: dim and warm filter over every app; see NightLight. -->
-                <TextView
-                    android:id="@+id/btnNight"
-                    style="@style/TopButtonIcon"
-                    android:contentDescription="@string/night_mode"
-                    android:drawableStart="@drawable/ic_moon"
-                    android:nextFocusDown="@+id/grid" />
 
                 <TextView
                     android:id="@+id/btnInputs"

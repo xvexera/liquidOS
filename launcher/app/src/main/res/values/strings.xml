@@ -191,7 +191,7 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
-    <string name="night_dim">Dim</string>
+    <string name="night_dim">Dim (artificial)</string>
     <string name="night_warm">Warm light</string>
     <string name="calendar_list_days">Show events for</string>
     <string name="settings_subtitle">Layout, glass and motion. OK on a value to change it with Left and Right. Apps, widgets, wallpapers and the dock are in the Settings menu on Home.</string>
@@ -224,4 +224,24 @@
     <string name="rim_intensity_hint">How strongly the edges of the app tiles catch the light; 0 turns it off.</string>
     <string name="wallpaper_icon">Background from icon</string>
     <string name="wallpaper_oled">None (OLED black)</string>
+    <string name="night_real">Real TV brightness</string>
+    <string name="night_real_hdmi">This device sends the picture to the TV over HDMI, which has no brightness command: change it in the TV’s own menu.</string>
+    <string name="night_real_needs_grant">Needs the WRITE_SETTINGS grant over adb: appops set com.gathin.tvhome WRITE_SETTINGS allow</string>
+    <string name="wallpaper_colours">Colours</string>
+    <string name="wallpaper_nasa">NASA</string>
+    <string name="wallpaper_retro">Retro</string>
+    <string name="wallpaper_nasa_credit">Images: NASA · ESA · CSA · STScI</string>
+    <string name="upload_phone">Upload from phone</string>
+    <string name="upload_tv_hint">Scan with your phone\'s camera. The phone must be on the same Wi-Fi as the TV.</string>
+    <string name="upload_no_network">The TV is not connected to a network.</string>
+    <string name="upload_page_hint">The photo becomes the TV\'s wallpaper as soon as it arrives.</string>
+    <string name="upload_pick">Choose a photo</string>
+    <string name="upload_link_hint">…or paste a link to a picture</string>
+    <string name="upload_send_link">Send link</string>
+    <string name="upload_sending">Sending…</string>
+    <string name="upload_done">Done! It is on the TV.</string>
+    <string name="upload_failed">Could not send it. Try another picture.</string>
+    <string name="wallpaper_uploads">Uploaded wallpapers</string>
+    <string name="wallpaper_upload_label">Photo · %1$s</string>
+    <string name="wallpaper_delete">Delete</string>
 </resources>

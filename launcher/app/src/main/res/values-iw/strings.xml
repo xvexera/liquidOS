@@ -188,7 +188,7 @@
         <item quantity="two">%1$d ימים</item>
         <item quantity="other">%1$d ימים</item>
     </plurals>
-    <string name="night_dim">עמעום</string>
+    <string name="night_dim">עמעום (מלאכותי)</string>
     <string name="night_warm">אור חם</string>
     <string name="calendar_list_days">הצגת אירועים ל</string>
     <string name="settings_subtitle">פריסה, זכוכית ותנועה. OK על ערך כדי לשנות אותו בחצים. אפליקציות, ווידג׳טים, טפטים וה-Dock נמצאים בתפריט ההגדרות במסך הבית.</string>
@@ -221,4 +221,24 @@
     <string name="rim_intensity_hint">כמה שולי האפליקציות מחזירים אור כמו זכוכית; 0 מכבה.</string>
     <string name="wallpaper_icon">רקע לפי סמל</string>
     <string name="wallpaper_oled">ללא (שחור OLED)</string>
+    <string name="night_real">בהירות אמיתית של הטלוויזיה</string>
+    <string name="night_real_hdmi">המכשיר שולח את התמונה לטלוויזיה ב-HDMI, שאין בו פקודת בהירות: שנו אותה בתפריט של הטלוויזיה.</string>
+    <string name="night_real_needs_grant">דורש הרשאת WRITE_SETTINGS דרך adb: appops set com.gathin.tvhome WRITE_SETTINGS allow</string>
+    <string name="wallpaper_colours">צבעים</string>
+    <string name="wallpaper_nasa">NASA</string>
+    <string name="wallpaper_retro">רטרו</string>
+    <string name="wallpaper_nasa_credit">תמונות: NASA · ESA · CSA · STScI</string>
+    <string name="upload_phone">העלאה מהטלפון</string>
+    <string name="upload_tv_hint">סרקו במצלמת הטלפון. הטלפון צריך להיות באותה רשת Wi-Fi כמו הטלוויזיה.</string>
+    <string name="upload_no_network">הטלוויזיה לא מחוברת לרשת.</string>
+    <string name="upload_page_hint">התמונה תוגדר כרקע בטלוויזיה מיד כשתגיע.</string>
+    <string name="upload_pick">בחירת תמונה</string>
+    <string name="upload_link_hint">…או הדביקו קישור לתמונה</string>
+    <string name="upload_send_link">שליחת קישור</string>
+    <string name="upload_sending">שולח…</string>
+    <string name="upload_done">מוכן! התמונה בטלוויזיה.</string>
+    <string name="upload_failed">השליחה נכשלה. נסו תמונה אחרת.</string>
+    <string name="wallpaper_uploads">רקעים שהועלו</string>
+    <string name="wallpaper_upload_label">תמונה · %1$s</string>
+    <string name="wallpaper_delete">מחיקה</string>
 </resources>

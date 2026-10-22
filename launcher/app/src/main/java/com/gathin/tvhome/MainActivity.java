@@ -44,13 +44,13 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.SpannableString;
 import android.text.Spanned;
-import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.SoundEffectConstants;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -221,8 +221,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private Dialog cardPrompt;
     /** Set when a decision could not be saved: no more prompts until the next resume, instead of asking in a loop. */
     private boolean promptsPaused;
-    /** Rebuild the tiles on resume: Home was fully hidden by an app, or Home was pressed. Not after a side panel such as Wi-Fi settings. */
+    /**
+     * Rebuild the tiles on resume: the first time, when Home was pressed, or when apps were installed, updated or
+     * removed while Home was hidden. Coming back from an app with nothing changed keeps the tiles as they are, so
+     * Home is back at once.
+     */
     private boolean rebuildOnResume = true;
+    /** Home is stopped (an app covers it): package changes only mark the tiles for a rebuild on return. */
+    private boolean stopped;
+    /** The package receiver stays registered from the first onStart to onDestroy, to see changes made meanwhile. */
+    private boolean packagesWatched;
+    /** Lights the focused pill and hides the tiles' glass when focus leaves them; removed in onDestroy. */
+    private ViewTreeObserver.OnGlobalFocusChangeListener focusWatcher;
     /** The Inputs or Module cards dropdown while one is open, so onPause can close it. */
     private PopupWindow openPopup;
     /** Reorder mode is on (top-bar button). */
@@ -288,6 +298,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // Updates send REMOVED followed by ADDED; keep the tile until the new APK is ready.
             if (Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())
                     && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return;
+            if (stopped) {
+                rebuildOnResume = true;
+                return;
+            }
             reloadApps(false);
             if (appLibrary != null) appLibrary.refresh();
         }
@@ -316,6 +330,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (forwardToHome()) return;
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
@@ -344,8 +359,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         getWindow().setBackgroundDrawable(null);
         settingsRevision = Extras.revision(this);
         wallpaperPlayer = new WallpaperPlayer(this, root, cfg);
-        boolean oled = WallpaperChoices.OLED.equals(getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
-                .getString(Config.WALLPAPER_CHOICE_KEY, null));
+        String choice = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
+                .getString(Config.WALLPAPER_CHOICE_KEY, null);
+        boolean oled = WallpaperChoices.OLED.equals(choice);
         glowOff = oled || wallpaperPlayer.current() != null || OnlineWallpapers.active(this);
         liquidGlass = Extras.liquidGlass(this);
         if (liquidGlass) {
@@ -607,7 +623,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 focusTile(lastFocused % COLUMNS);
                 return true;
             }
-            int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : R.id.btnWifi;
+            int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs
+                    : btnCalendar.getVisibility() == View.VISIBLE ? R.id.btnCalendar : R.id.btnNight;
             int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
             int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
@@ -646,11 +663,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         uiGlint = new GlintView(this);
         uiGlint.setAlpha(0f);
         root.addView(uiGlint, new FrameLayout.LayoutParams(10, 10));
-        getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
+        focusWatcher = (oldF, newF) -> {
             boolean onTile = newF != null && newF.getId() == R.id.card;
             if (!onTile) hideGlass();
             lightUp(oldF, newF);
-        });
+        };
+        getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener(focusWatcher);
 
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
@@ -690,6 +708,28 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * Back to the top with the first dock tile focused, like the stock launcher. Back from an app
      * never comes this way, so returning to the app you left from is unchanged (#118).
      */
+    /**
+     * Opened some other way than as Home (from the app list, or by name) while this launcher is the TV's Home: hand
+     * the intent to the Home that is already running instead of building a second one beside it, which would hold
+     * another full copy of the screen in memory. True when this activity is finishing for that.
+     */
+    private boolean forwardToHome() {
+        Intent intent = getIntent();
+        if (intent == null || intent.hasCategory(Intent.CATEGORY_HOME)) return false;
+        android.content.pm.ResolveInfo home = getPackageManager().resolveActivity(
+                new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+        if (home == null || home.activityInfo == null || !getPackageName().equals(home.activityInfo.packageName)) {
+            return false;
+        }
+        Intent forward = new Intent(intent).setAction(Intent.ACTION_MAIN).setData(null)
+                .addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        forward.removeCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+        forward.removeCategory(Intent.CATEGORY_LAUNCHER);
+        startActivity(forward);
+        finish();
+        return true;
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -704,13 +744,15 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onStart() {
         super.onStart();
+        stopped = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED);
+            if (!packagesWatched) registerReceiver(packageReceiver, packageFilter, Context.RECEIVER_NOT_EXPORTED);
             registerReceiver(timeReceiver, timeFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
-            registerReceiver(packageReceiver, packageFilter);
+            if (!packagesWatched) registerReceiver(packageReceiver, packageFilter);
             registerReceiver(timeReceiver, timeFilter);
         }
+        packagesWatched = true;
         updateClockVisibility();
     }
 
@@ -874,10 +916,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onStop() {
         super.onStop();
-        unregisterReceiver(packageReceiver);
+        stopped = true;
         unregisterReceiver(timeReceiver);
         handler.removeCallbacks(clockCheck);
-        rebuildOnResume = true;
+        // The cinematic shelf's "Last opened" line changes with every app opened from Home.
+        if (cinematic) rebuildOnResume = true;
     }
 
     @Override
@@ -889,6 +932,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    private final Runnable collectGarbage = () -> {
+        Thread gc = new Thread(Runtime.getRuntime()::gc, "home-gc");
+        gc.setPriority(Thread.MIN_PRIORITY);
+        gc.start();
+    };
+
     /** Home is hidden behind an app: let go of what is cheap to make again. */
     @Override
     public void onTrimMemory(int level) {
@@ -896,6 +945,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
             heroArtCache.clear();
             heroArtKey = null;
+            // Bitmaps let go of by Home only return to the system after a garbage collection, and Home allocates
+            // too little Java memory to trigger one: run it once the app in front has had time to start.
+            handler.removeCallbacks(collectGarbage);
+            handler.postDelayed(collectGarbage, 5000);
+            // A 1080p picture is a few megabytes the app in front (YouTube) can use; it comes back on return.
             wallpaperPlayer.release();
         }
     }
@@ -903,6 +957,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (wallpaperPlayer == null) return;   // forwarded to Home before anything was set up
+        // A rebuild (recreate) keeps the window and its tree observer: a listener left there would keep this whole
+        // Home, bitmaps and all, alive next to the new one.
+        ViewTreeObserver observer = getWindow().getDecorView().getViewTreeObserver();
+        if (observer.isAlive()) observer.removeOnGlobalFocusChangeListener(focusWatcher);
+        if (packagesWatched) unregisterReceiver(packageReceiver);
         wallpaperPlayer.close();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
@@ -2155,6 +2215,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             if (!online) {
                 text = getString(R.string.offline);
+                icon = R.drawable.ic_wifi_off;
                 vpn = false;
             } else if (ethernet) {
                 text = getString(R.string.ethernet);
@@ -2179,22 +2240,22 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // Network name, then the green lock-and-VPN (or red "VPN off") capsule drawn in place of the word.
             String badge = getString(vpn ? R.string.vpn : R.string.vpn_off);
             VpnBadge span = new VpnBadge(vpn ? getDrawable(R.drawable.ic_lock) : null, density);
-            // The pill has a maximum width and ellipsizes at the end, which would cut the badge off after
-            // a long network name, so shorten the name to whatever room the badge leaves. The total paddings
-            // include the Wi-Fi icon.
-            TextPaint paint = btnWifi.getPaint();
-            float room = btnWifi.getMaxWidth() - btnWifi.getTotalPaddingStart() - btnWifi.getTotalPaddingEnd()
-                    - span.getSize(paint, badge, 0, badge.length(), null) - paint.measureText(" ") - 2 * density;
-            String name = TextUtils.ellipsize(text, paint, Math.max(0, room), TextUtils.TruncateAt.END).toString();
-            // A long badge ("VPN отключён") can leave room for a stub like "MT…", which says nothing and, after
-            // rounding, can push the badge itself out of the pill. Show the badge alone then.
-            // The space stays even then: a line holding only the span gets no font metrics and collapses.
-            text = name.length() < text.length() && name.length() < 5 ? "" : name;
-            SpannableString label = new SpannableString(text + " " + badge);
-            label.setSpan(span, text.length() + 1, label.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            // The pill shows only the icon, so the badge comes alone after it. The space stays: a line holding only
+            // the span gets no font metrics and collapses.
+            SpannableString label = new SpannableString(" " + badge);
+            label.setSpan(span, 1, label.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             btnWifi.setText(label);
         } else {
-            btnWifi.setText(text);
+            btnWifi.setText("");
+        }
+        // Icon only (the network's name stays in the popup), widened into a pill when a VPN badge is showing.
+        btnWifi.setContentDescription(text);
+        ViewGroup.LayoutParams wifiLp = btnWifi.getLayoutParams();
+        int wifiWidth = vpn || vpnDown ? ViewGroup.LayoutParams.WRAP_CONTENT : (int) (42 * density);
+        if (wifiLp.width != wifiWidth) {
+            wifiLp.width = wifiWidth;
+            btnWifi.setLayoutParams(wifiLp);
+            btnWifi.setCompoundDrawablePadding(vpn || vpnDown ? (int) (6 * density) : 0);
         }
         if (festive && diya != null) {
             if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
@@ -2706,7 +2767,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         Rect r = new Rect(0, 0, to.getWidth(), to.getHeight());
-        root.offsetDescendantRectToMyCoords(to, r);
+        try {
+            root.offsetDescendantRectToMyCoords(to, r);
+        } catch (IllegalArgumentException notOnHome) {
+            // a view of the Home being rebuilt (recreate) or of another window: no glow for it
+            return;
+        }
         int pad = (int) (6 * density);   // GlintView keeps 6dp round the slab for nothing else to draw in
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) uiGlint.getLayoutParams();
         lp.width = r.width() + 2 * pad;
@@ -2841,64 +2907,125 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /**
-     * Wallpaper: moving through the list previews each picture behind the menu with a cross-fade; OK keeps it, Back puts
-     * the old one back. Rotating wallpaper is one of the choices: picking it unfolds its categories and interval right
-     * under it, without leaving the menu, and while it is on, "Change wallpaper now" leads the list.
+     * Wallpaper, in sections, each with its icon: on top None (OLED black) and Background from icon (adaptive), then
+     * Rotating wallpaper, whose settings and Change now unfold under it, then Colours (the gradients, folded), then the
+     * pictures one by one. Moving through the list previews each wallpaper behind the menu with a cross-fade; OK keeps
+     * it, Back puts the old one back.
      */
     private void showWallpaperMenu() {
         SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
         String current = prefs.getString(Config.WALLPAPER_CHOICE_KEY, null);
-        boolean rotating = OnlineWallpapers.CHOICE.equals(current);
         boolean[] picked = {false};    // another wallpaper chosen: Home is rebuilt around it
         boolean[] refetch = {false};   // rotating categories changed: the next picture comes from them
         List<View> items = new ArrayList<>();
-        View focus = null;
-        if (rotating) {
-            View now = menuRow(getString(R.string.online_change_now), "");
-            now.setOnClickListener(v -> {
-                if (openPopup != null) openPopup.dismiss();
-                refreshOnlineWallpaper(true);
-            });
-            items.add(now);
-        }
-        for (WallpaperChoices.Choice choice : WallpaperChoices.all(this)) {
+        View[] focus = {null};
+        List<WallpaperChoices.Choice> all = WallpaperChoices.all(this);
+        java.util.Map<String, WallpaperChoices.Choice> byValue = new java.util.HashMap<>();
+        for (WallpaperChoices.Choice c : all) byValue.put(c.value, c);
+
+        java.util.function.BiFunction<WallpaperChoices.Choice, Integer, View> pick = (choice, icon) -> {
             boolean isCurrent = choice.value.equals(current);
-            boolean online = OnlineWallpapers.CHOICE.equals(choice.value);
-            View row = menuRow(choice.label, isCurrent ? "\u2713" : "");
-            if (isCurrent) focus = row;
+            View row = menuRow(choice.label, isCurrent ? "✓" : "");
+            menuIcon(row, icon);
+            if (isCurrent) focus[0] = row;
             row.setOnFocusChangeListener((v, has) -> {
                 if (has) wallpaperPlayer.preview(choice);
             });
-            List<View> settings = online ? rotatingRows(refetch) : null;
             row.setOnClickListener(v -> {
-                if (!online) {
-                    picked[0] = true;
-                    prefs.edit().putString(Config.WALLPAPER_CHOICE_KEY, choice.value).apply();
-                    Extras.bumpRevision(this);
-                    if (openPopup != null) openPopup.dismiss();
-                    return;
-                }
-                if (settings.get(0).getParent() != null) {   // already on and unfolded: nothing more to do here
-                    settings.get(0).requestFocus();
-                    return;
-                }
-                // Turning rotation on: tick it, and unfold its settings under it so categories can be picked now.
+                picked[0] = true;
+                prefs.edit().putString(Config.WALLPAPER_CHOICE_KEY, choice.value).apply();
+                Extras.bumpRevision(this);
+                if (openPopup != null) openPopup.dismiss();
+            });
+            return row;
+        };
+
+        // None (OLED black) and Background from icon, on top
+        items.add(pick.apply(byValue.get(WallpaperChoices.OLED), R.drawable.ic_oled));
+        items.add(pick.apply(byValue.get(WallpaperChoices.NONE), R.drawable.ic_adaptive));
+
+        // Rotating wallpaper: its own settings and Change now fold under it
+        boolean rotating = OnlineWallpapers.CHOICE.equals(current);
+        WallpaperChoices.Choice online = byValue.get(OnlineWallpapers.CHOICE);
+        View rot = menuRow(online.label, rotating ? "✓" : "");
+        menuIcon(rot, R.drawable.ic_rotate);
+        if (rotating) focus[0] = rot;
+        List<View> rotSettings = new ArrayList<>();
+        View now = menuRow(getString(R.string.online_change_now), "");
+        now.setPaddingRelative(now.getPaddingStart() + (int) (16 * density), 0, now.getPaddingEnd(), 0);
+        now.setOnClickListener(v -> {
+            if (openPopup != null) openPopup.dismiss();
+            if (OnlineWallpapers.active(this)) refreshOnlineWallpaper(true);
+        });
+        rotSettings.add(now);
+        rotSettings.addAll(rotatingRows(refetch));
+        rot.setOnFocusChangeListener((v, has) -> {
+            if (has) wallpaperPlayer.preview(online);
+        });
+        rot.setOnClickListener(v -> {
+            LinearLayout list = (LinearLayout) v.getParent();
+            if (!OnlineWallpapers.CHOICE.equals(prefs.getString(Config.WALLPAPER_CHOICE_KEY, null))) {
+                // Turning rotation on: tick it and unfold its settings so categories can be picked now.
                 picked[0] = true;
                 prefs.edit().putString(Config.WALLPAPER_CHOICE_KEY, OnlineWallpapers.CHOICE).apply();
                 Extras.bumpRevision(this);
-                LinearLayout list = (LinearLayout) v.getParent();
                 for (int i = 0; i < list.getChildCount(); i++) {
                     TextView status = list.getChildAt(i).findViewById(R.id.status);
-                    if (status != null) status.setText(list.getChildAt(i) == v ? "\u2713" : "");
+                    if (status != null && "✓".contentEquals(status.getText())) status.setText("");
                 }
-                int at = list.indexOfChild(v);
-                for (int i = 0; i < settings.size(); i++) list.addView(settings.get(i), at + 1 + i);
-                settings.get(0).requestFocus();
-            });
-            items.add(row);
-            if (online && rotating) items.addAll(settings);
+                ((TextView) v.findViewById(R.id.status)).setText("✓");
+            }
+            fold(list, v, rotSettings, rotSettings.get(0).getParent() == null);
+        });
+        items.add(rot);
+        if (rotating) items.addAll(rotSettings);
+
+        // Upload from phone: a QR code for the phone to send a picture, which becomes the wallpaper as it arrives
+        View upload = menuRow(getString(R.string.upload_phone), "");
+        menuIcon(upload, R.drawable.ic_qr);
+        upload.setOnClickListener(v -> {
+            if (openPopup != null) openPopup.dismiss();
+            handler.postDelayed(this::showUploadQr, 200);
+        });
+        items.add(upload);
+
+        // Colours: the gradients, folded under one row
+        List<View> colours = new ArrayList<>();
+        // NASA and Retro pictures (by file name prefix), each in its own folder like the colours
+        List<View> nasa = new ArrayList<>();
+        List<View> retro = new ArrayList<>();
+        List<View> loose = new ArrayList<>();
+        List<View> uploads = new ArrayList<>();
+        for (WallpaperChoices.Choice c : all) {
+            if (c.value.equals(WallpaperChoices.OLED) || c.value.equals(WallpaperChoices.NONE)
+                    || c.value.equals(OnlineWallpapers.CHOICE)) continue;
+            String name = c.value.toLowerCase(java.util.Locale.ROOT);
+            boolean colour = c.value.startsWith(BuiltinWallpapers.PREFIX)
+                    && BuiltinWallpapers.isColour(c.value.substring(BuiltinWallpapers.PREFIX.length()));
+            List<View> into = colour ? colours : name.startsWith(WallpaperChoices.NASA) ? nasa
+                    : name.startsWith(WallpaperChoices.RETRO) ? retro : name.startsWith(PhoneUpload.PREFIX) ? uploads : loose;
+            View row = pick.apply(c, colour ? R.drawable.ic_palette : R.drawable.ic_picture);
+            if (into != loose) row.setPaddingRelative(row.getPaddingStart() + (int) (16 * density), 0, row.getPaddingEnd(), 0);
+            if (into == uploads) addDeleteButton(row, c, uploads, picked);
+            into.add(row);
         }
-        showListMenu(R.string.section_wallpaper, items, focus, () -> {
+        if (!nasa.isEmpty()) {
+            // The credit, quietly at the foot of the folder: small, dim and never focused.
+            View credit = menuRow(getString(R.string.wallpaper_nasa_credit), "");
+            credit.setFocusable(false);
+            credit.setAlpha(0.4f);
+            ((TextView) credit.findViewById(R.id.title)).setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+            nasa.add(credit);
+        }
+        folder(items, getString(R.string.wallpaper_uploads), R.drawable.ic_upload, uploads, focus);
+        folder(items, getString(R.string.wallpaper_colours), R.drawable.ic_palette, colours, focus);
+        folder(items, getString(R.string.wallpaper_nasa), R.drawable.ic_space, nasa, focus);
+        folder(items, getString(R.string.wallpaper_retro), R.drawable.ic_retro, retro, focus);
+
+        // The other pictures, one by one: built-in scenes and the theme's own
+        items.addAll(loose);
+
+        showListMenu(R.string.section_wallpaper, items, focus[0], () -> {
             // New categories should show at once, not at the next rotation.
             if (refetch[0]) OnlineWallpapers.expire(this);
             if (picked[0]) {
@@ -2909,6 +3036,161 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 if (refetch[0] && OnlineWallpapers.active(this)) refreshOnlineWallpaper(true);
             }
         });
+    }
+
+    /**
+     * Adds a folder row to a menu: {@code children} unfold under it on OK. It starts open when one of them is the
+     * current (focused) row, and is left out when it has nothing in it.
+     */
+    private void folder(List<View> items, String label, int icon, List<View> children, View[] focus) {
+        if (children.isEmpty()) return;
+        boolean open = children.contains(focus[0]);
+        View row = menuRow(label, open ? "⌄" : "›");
+        menuIcon(row, icon);
+        row.setOnClickListener(v -> {
+            if (children.isEmpty()) return;
+            boolean opening = children.get(0).getParent() == null;
+            fold((LinearLayout) v.getParent(), v, children, opening);
+            ((TextView) v.findViewById(R.id.status)).setText(opening ? "⌄" : "›");
+        });
+        items.add(row);
+        if (open) items.addAll(children);
+    }
+
+    /**
+     * Puts an X at the end of an uploaded picture's row: Right (Left in a right-to-left language) reaches it and OK
+     * deletes the picture. A deleted wallpaper that was in use gives way to OLED black when the menu closes.
+     */
+    private void addDeleteButton(View row, WallpaperChoices.Choice choice, List<View> rows, boolean[] picked) {
+        ImageView x = new ImageView(this);
+        x.setImageResource(R.drawable.ic_close);
+        x.setBackgroundResource(R.drawable.close_bg);
+        int size = (int) (30 * density), pad = (int) (7 * density);
+        x.setPadding(pad, pad, pad, pad);
+        x.setFocusable(true);
+        x.setContentDescription(getString(R.string.wallpaper_delete));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.setMarginStart((int) (6 * density));
+        ((LinearLayout) row).addView(x, lp);
+        // A focused row turns white: the X goes dark on it, like the row's text, so it stays in sight.
+        View.OnFocusChangeListener rowFocus = row.getOnFocusChangeListener();
+        row.setOnFocusChangeListener((v, has) -> {
+            if (rowFocus != null) rowFocus.onFocusChange(v, has);
+            x.setImageTintList(android.content.res.ColorStateList.valueOf(has ? 0xFF111111 : 0xFFFFFFFF));
+            if (has) x.getBackground().mutate().setTint(0x1F000000);
+            else x.getBackground().setTintList(null);
+        });
+        boolean rtl = getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
+        int toX = rtl ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
+        int toRow = rtl ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT;
+        row.setOnKeyListener((v, code, e) -> {
+            if (code != toX) return false;
+            if (e.getAction() == KeyEvent.ACTION_DOWN) x.requestFocus();
+            return true;
+        });
+        x.setOnKeyListener((v, code, e) -> {
+            if (code == toX) return true;
+            if (code != toRow) return false;
+            if (e.getAction() == KeyEvent.ACTION_DOWN) row.requestFocus();
+            return true;
+        });
+        x.setOnClickListener(v -> {
+            LinearLayout list = (LinearLayout) row.getParent();
+            if (list == null) return;
+            //noinspection ResultOfMethodCallIgnored
+            choice.file.delete();
+            int at = list.indexOfChild(row);
+            rows.remove(row);
+            list.removeView(row);
+            if (rows.isEmpty()) list.removeViewAt(--at);   // the folder's own row goes with its last picture
+            SharedPreferences prefs = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
+            if (choice.value.equals(prefs.getString(Config.WALLPAPER_CHOICE_KEY, null))) {
+                prefs.edit().putString(Config.WALLPAPER_CHOICE_KEY, WallpaperChoices.OLED).apply();
+                Extras.bumpRevision(this);
+                picked[0] = true;
+            }
+            View next = list.getChildAt(Math.min(at, list.getChildCount() - 1));
+            if (next != null) next.requestFocus();
+        });
+    }
+
+    /**
+     * Upload from phone: a QR code to a page on this TV (see PhoneUpload). A picture sent from it is saved with the
+     * other uploads and becomes the wallpaper at once; the page stops working when this closes.
+     */
+    private void showUploadQr() {
+        File dir = Config.dir(this);
+        boolean[] uploaded = {false};
+        PhoneUpload server = dir == null ? null : PhoneUpload.start(this, new File(dir, "wallpapers"), file -> {
+            getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).edit()
+                    .putString(Config.WALLPAPER_CHOICE_KEY, file.getName()).apply();
+            Extras.bumpRevision(this);
+            uploaded[0] = true;
+            if (openPopup != null) openPopup.dismiss();
+        });
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        int pad = (int) (12 * density);
+        box.setPadding(pad, pad / 2, pad, pad);
+        box.setFocusable(true);
+        android.graphics.Bitmap code = server == null ? null : PhoneUpload.qr(server.url(), (int) (196 * density));
+        if (code != null) {
+            ImageView qr = new ImageView(this);
+            qr.setImageBitmap(code);
+            qr.setScaleType(ImageView.ScaleType.CENTER);
+            qr.setBackground(roundedWhite(14 * density));
+            qr.setClipToOutline(true);
+            box.addView(qr, new LinearLayout.LayoutParams(code.getWidth(), code.getHeight()));
+        }
+        TextView hint = new TextView(this);
+        hint.setText(server == null ? R.string.upload_no_network : R.string.upload_tv_hint);
+        hint.setTextColor(0xD9FFFFFF);
+        hint.setTextSize(13);
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(0, pad, 0, 0);
+        box.addView(hint);
+        if (server != null) {
+            TextView address = new TextView(this);
+            address.setText(server.url().replaceFirst("^http://", ""));
+            address.setTextColor(0x73FFFFFF);
+            address.setTextSize(11);
+            address.setGravity(Gravity.CENTER);
+            address.setPadding(0, pad / 2, 0, 0);
+            box.addView(address);
+        }
+        showListMenu(R.string.upload_phone, java.util.Collections.singletonList(box), box, () -> {
+            if (server != null) server.stop();
+            if (uploaded[0]) recreate();
+        });
+    }
+
+    private static android.graphics.drawable.GradientDrawable roundedWhite(float radius) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(0xFFFFFFFF);
+        d.setCornerRadius(radius);
+        return d;
+    }
+
+    /** Unfolds {@code children} right under {@code header} in a menu list, or folds them away. */
+    private void fold(LinearLayout list, View header, List<View> children, boolean open) {
+        if (open) {
+            int at = list.indexOfChild(header);
+            for (int i = 0; i < children.size(); i++) {
+                if (children.get(i).getParent() == null) list.addView(children.get(i), at + 1 + i);
+            }
+            children.get(0).requestFocus();
+        } else {
+            for (View child : children) list.removeView(child);
+            header.requestFocus();
+        }
+    }
+
+    /** Shows {@code icon} at the start of a menu row (rows are made without one). */
+    private void menuIcon(View row, int icon) {
+        ImageView image = row.findViewById(R.id.icon);
+        image.setImageResource(icon);
+        image.setVisibility(View.VISIBLE);
     }
 
     /** Rotating wallpaper's own rows, set in under its choice: a toggle per category, then the interval. */
@@ -3251,6 +3533,20 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         };
         dim.setOnChange(moved);
         warm.setOnChange(moved);
+        // The TV's real backlight, apart from night mode: only on a TV that runs Android (see RealBrightness).
+        GlassSlider real = panel.findViewById(R.id.realBrightness);
+        real.setIcon(R.drawable.ic_brightness);
+        TextView realHint = panel.findViewById(R.id.realHint);
+        if (RealBrightness.supported(this)) {
+            real.setValue(RealBrightness.get(this));
+            real.setOnChange(value -> RealBrightness.set(this, value));
+        } else {
+            real.setValue(0);
+            real.setFocusable(false);
+            real.setAlpha(0.4f);
+            realHint.setText(RealBrightness.hasPanel(this) ? R.string.night_real_needs_grant : R.string.night_real_hdmi);
+            realHint.setVisibility(View.VISIBLE);
+        }
         dropIn(popup, panel, btnNight, getResources().getBoolean(R.bool.rtl_menu_bar) ? Gravity.START : Gravity.END);
         toggle.requestFocus();
     }

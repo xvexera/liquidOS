@@ -27,7 +27,11 @@ import java.util.Map;
  * icon. Grey and black parts of a logo turn white, so dark wordmarks read on glass. Each logo is made once per app.
  */
 final class GlassIcons {
-    private static final Map<String, Drawable> logos = new HashMap<>();
+    /**
+     * The logos made so far, as bitmaps: each tile gets its own Drawable round them. A cached Drawable would keep a
+     * reference to the last view it was drawn in (its callback), and through it the whole Home of before a rebuild.
+     */
+    private static final Map<String, Bitmap> logos = new HashMap<>();
     /** The TV's Settings app: its tile shows the tvOS gear of the top bar's Settings pill, in every pack. */
     static final String SETTINGS_PKG = "com.android.tv.settings";
 
@@ -40,11 +44,10 @@ final class GlassIcons {
 
     /** The logo for this app, made on first use; null when it has neither a banner nor an icon. */
     static Drawable logo(Resources res, String key, Drawable banner, Drawable icon) {
-        if (logos.containsKey(key)) return logos.get(key);
-        if (key.startsWith(SETTINGS_PKG + "/")) {
-            Drawable gear = res.getDrawable(R.drawable.ic_settings, null);
-            logos.put(key, gear);
-            return gear;
+        if (key.startsWith(SETTINGS_PKG + "/")) return res.getDrawable(R.drawable.ic_settings, null);
+        if (logos.containsKey(key)) {
+            Bitmap cached = logos.get(key);
+            return cached == null ? null : new BitmapDrawable(res, cached);
         }
         Bitmap made = null;
         try {
@@ -57,9 +60,8 @@ final class GlassIcons {
         } catch (RuntimeException | OutOfMemoryError ignored) {
             made = null;
         }
-        Drawable d = made == null ? null : new BitmapDrawable(res, made);
-        logos.put(key, d);
-        return d;
+        logos.put(key, made);
+        return made == null ? null : new BitmapDrawable(res, made);
     }
 
     private static Bitmap render(Drawable d, int w, int h) {

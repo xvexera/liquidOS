@@ -148,7 +148,7 @@
         <item quantity="one">%1$d día</item>
         <item quantity="other">%1$d días</item>
     </plurals>
-    <string name="night_dim">Atenuación</string>
+    <string name="night_dim">Atenuación (artificial)</string>
     <string name="night_warm">Luz cálida</string>
     <string name="calendar_list_days">Mostrar eventos de</string>
     <string name="settings_subtitle">Diseño, vidrio y movimiento. Pulsa OK sobre un valor para cambiarlo con Izquierda y Derecha. Apps, widgets, fondos y el dock están en el menú Ajustes del inicio.</string>
@@ -181,4 +181,24 @@
     <string name="rim_intensity_hint">Cuánto brillan los bordes de las apps como vidrio; 0 lo desactiva.</string>
     <string name="wallpaper_icon">Fondo por icono</string>
     <string name="wallpaper_oled">Ninguno (negro OLED)</string>
+    <string name="night_real">Brillo real de la TV</string>
+    <string name="night_real_hdmi">Este equipo envía la imagen a la TV por HDMI, que no tiene comando de brillo: cámbialo en el menú de la propia TV.</string>
+    <string name="night_real_needs_grant">Necesita el permiso WRITE_SETTINGS por adb: appops set com.gathin.tvhome WRITE_SETTINGS allow</string>
+    <string name="wallpaper_colours">Colores</string>
+    <string name="wallpaper_nasa">NASA</string>
+    <string name="wallpaper_retro">Retro</string>
+    <string name="wallpaper_nasa_credit">Imágenes: NASA · ESA · CSA · STScI</string>
+    <string name="upload_phone">Subir desde el teléfono</string>
+    <string name="upload_tv_hint">Escanea con la cámara del teléfono. Tiene que estar en la misma red Wi-Fi que la TV.</string>
+    <string name="upload_no_network">La TV no está conectada a una red.</string>
+    <string name="upload_page_hint">La foto se pone de fondo en la TV apenas llega.</string>
+    <string name="upload_pick">Elegir foto</string>
+    <string name="upload_link_hint">…o pega el link de una imagen</string>
+    <string name="upload_send_link">Enviar link</string>
+    <string name="upload_sending">Enviando…</string>
+    <string name="upload_done">¡Listo! Ya está en la TV.</string>
+    <string name="upload_failed">No se pudo enviar. Prueba con otra imagen.</string>
+    <string name="wallpaper_uploads">Fondos subidos</string>
+    <string name="wallpaper_upload_label">Foto · %1$s</string>
+    <string name="wallpaper_delete">Borrar</string>
 </resources>

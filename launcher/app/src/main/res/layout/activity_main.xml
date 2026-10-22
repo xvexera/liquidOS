@@ -504,16 +504,6 @@
                     android:drawableStart="@drawable/ic_input"
                     android:nextFocusDown="@+id/grid" />
 
-                <TextView
-                    android:id="@+id/btnWifi"
-                    style="@style/TopButton"
-                    android:maxWidth="180dp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:text="@string/wifi"
-                    android:drawableStart="@drawable/ic_wifi"
-                    android:nextFocusDown="@+id/grid" />
-
                 <!-- Calendar: the next events of the TV's synced Google calendars; the count of the coming days next to
                      the icon. See CalendarEvents. -->
                 <TextView
@@ -530,6 +520,16 @@
                     style="@style/TopButtonIcon"
                     android:contentDescription="@string/night_mode"
                     android:drawableStart="@drawable/ic_moon"
+                    android:nextFocusDown="@+id/grid" />
+
+                <!-- Network: the icon alone, Wi-Fi (or Ethernet) when online and crossed out when not; a VPN badge widens
+                     it into a pill. -->
+                <TextView
+                    android:id="@+id/btnWifi"
+                    style="@style/TopButtonIcon"
+                    android:singleLine="true"
+                    android:contentDescription="@string/wifi"
+                    android:drawableStart="@drawable/ic_wifi"
                     android:nextFocusDown="@+id/grid" />
 
                 <TextView

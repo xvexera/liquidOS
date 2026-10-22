@@ -71,6 +71,38 @@
         android:layout_marginTop="2dp" />
 
     <TextView
+        android:id="@+id/realLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:paddingStart="12dp"
+        android:text="@string/night_real"
+        android:textColor="#B3FFFFFF"
+        android:textSize="11sp"
+        android:fontFamily="@font/outfit_medium"
+        android:letterSpacing="0.16"
+        android:textAllCaps="true" />
+
+    <com.gathin.tvhome.GlassSlider
+        android:id="@+id/realBrightness"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginTop="2dp" />
+
+    <TextView
+        android:id="@+id/realHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:textColor="#99FFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/nightHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

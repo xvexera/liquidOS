@@ -120,7 +120,9 @@ public class DockDecoration extends RecyclerView.ItemDecoration {
     }
 
     void setScrolling(boolean on, RecyclerView parent) {
-        if (alwaysRefract) return;
+        // With no picture behind the glass (black background) the plain and the refracting band look alike: no
+        // swap, no fade, nothing to flash.
+        if (alwaysRefract || !LiquidGlass.hasBackdrop()) return;
         if (scrolling == on) return;
         scrolling = on;
         if (fadeIn != null) fadeIn.cancel();

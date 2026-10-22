@@ -56,6 +56,12 @@ final class BuiltinWallpapers {
         return names;
     }
 
+    /** A plain colour gradient (Aurora, Ocean…), shown under Colours, rather than a scene. */
+    static boolean isColour(String name) {
+        for (Object[] g : GRADIENTS) if (g[0].equals(name)) return true;
+        return false;
+    }
+
     static boolean exists(String name) {
         for (String n : names()) if (n.equals(name)) return true;
         return false;
