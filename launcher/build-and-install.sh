@@ -82,8 +82,17 @@ if ! printf '%s' "$START_OUT" | grep -qF 'Status: ok' || printf '%s' "$START_OUT
   echo "ERROR: the new launcher did not start (see above); $STOCK_LAUNCHER was left enabled." >&2
   exit 1
 fi
+# Besides location (the Wi-Fi name), what the Home features need and nothing on the TV can ask for: the
+# calendar pill (READ_CALENDAR), night mode's overlay over other apps (SYSTEM_ALERT_WINDOW,
+# WRITE_SECURE_SETTINGS), the real brightness bar on TVs with a panel (WRITE_SETTINGS) and the Now playing
+# widget (the notification listener). Each line carries on if this Android version does not know it.
 printf '%s\n' \
   "pm grant com.gathin.tvhome android.permission.ACCESS_FINE_LOCATION 2>/dev/null; echo location-granted" \
+  "pm grant com.gathin.tvhome android.permission.READ_CALENDAR 2>/dev/null; echo calendar-granted" \
+  "pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS 2>/dev/null; echo secure-settings-granted" \
+  "appops set com.gathin.tvhome SYSTEM_ALERT_WINDOW allow 2>/dev/null; echo overlay-allowed" \
+  "appops set com.gathin.tvhome WRITE_SETTINGS allow 2>/dev/null; echo settings-allowed" \
+  "cmd notification allow_listener com.gathin.tvhome/com.gathin.tvhome.MediaListener 2>/dev/null; echo media-listener-allowed" \
   "cmd package compile -m speed -f com.gathin.tvhome" \
   "$DISABLE_STOCK" \
   "cmd package set-home-activity --user 0 com.gathin.tvhome/.MainActivity" \

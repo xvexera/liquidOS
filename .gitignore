@@ -14,3 +14,8 @@ backup/
 *.aab
 launcher/hs_err_pid*.log
 launcher/replay_pid*.log
+
+# Your own theme's wallpaper collection: pictures you may not redistribute (and personal ones) stay local.
+themes/mi-onn/wallpapers/
+# adb downloaded by tools/instalar-tv.ps1
+tools/platform-tools/
