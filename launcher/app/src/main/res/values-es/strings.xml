@@ -201,4 +201,9 @@
     <string name="wallpaper_uploads">Fondos subidos</string>
     <string name="wallpaper_upload_label">Foto · %1$s</string>
     <string name="wallpaper_delete">Borrar</string>
+    <string name="credits_made_by">Creado con mucho detalle para tu pantalla por Wade</string>
+    <string name="thanks_section">Agradecimientos</string>
+    <string name="thanks_title">¿Quieres agradecerme? 😊</string>
+    <string name="thanks_network">BTC o USDT · red BNB Smart Chain (BEP20)</string>
+    <string name="thanks_warning">⚠ IMPORTANTE: envía solo por BEP20 (BSC)</string>
 </resources>

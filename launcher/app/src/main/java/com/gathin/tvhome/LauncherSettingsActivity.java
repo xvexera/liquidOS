@@ -61,6 +61,7 @@ public final class LauncherSettingsActivity extends Activity {
         setContentView(scroll);
 
         content.addView(text(getString(R.string.launcher_settings), 34, R.font.outfit_light, 0xFFFFFFFF));
+        content.addView(credits());
         TextView subtitle = text(getString(R.string.settings_subtitle), 14, R.font.outfit_regular, 0x99FFFFFF);
         subtitle.setPadding(0, dp(6), 0, 0);
         content.addView(subtitle);
@@ -136,6 +137,9 @@ public final class LauncherSettingsActivity extends Activity {
         advancedToggle = (GlassToggle) ((ViewGroup) advancedRow).getChildAt(1);
         enable(advancedRow, animations);
 
+        // Thanks: how to tip the author, right under Motion where it is seen.
+        thanks(right);
+
         // System
         LinearLayout system = section(left, R.string.section_system);
         screensaverRows(system);
@@ -153,6 +157,58 @@ public final class LauncherSettingsActivity extends Activity {
         });
 
         firstRow.requestFocus();
+    }
+
+    /** Where tips go: one address on BNB Smart Chain (BEP20) takes both BTC and USDT. */
+    private static final String TIP_ADDRESS = "0x612bd350dd82edc6772b375a5c534540439a9ef7";
+
+    /**
+     * The thank-you panel under Motion: a line, the network, a yellow "send only on BEP20" warning, the address on two
+     * lines (a column is too narrow for it on one) and its QR code for a phone. It takes focus so Down scrolls to it;
+     * focused it turns white like every row, its text dark.
+     */
+    private void thanks(LinearLayout column) {
+        LinearLayout panel = section(column, R.string.thanks_section);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18), dp(14), dp(18), dp(16));
+        box.setBackgroundResource(R.drawable.input_row_bg);
+        box.setFocusable(true);
+        TextView title = text(getString(R.string.thanks_title), 20, R.font.outfit_medium, 0xFFFFFFFF);
+        title.setTextColor(getColorStateList(R.drawable.pill_text));
+        TextView network = text(getString(R.string.thanks_network), 13, R.font.outfit_regular, 0xFFFFFFFF);
+        network.setTextColor(getColorStateList(R.drawable.pill_text_dim));
+        network.setPadding(0, dp(4), 0, 0);
+        // Yellow, and a darker amber on the focused (white) row so it stays readable.
+        TextView warning = text(getString(R.string.thanks_warning), 14, R.font.outfit_medium, 0xFFFFD60A);
+        warning.setTextColor(new android.content.res.ColorStateList(
+                new int[][]{{android.R.attr.state_focused}, {}}, new int[]{0xFF9A6200, 0xFFFFD60A}));
+        warning.setPadding(0, dp(8), 0, dp(10));
+        int half = TIP_ADDRESS.length() - 15;   // split as Binance shows it: 0x + 25 characters, then 15
+        TextView address = text(TIP_ADDRESS.substring(0, half) + "\n" + TIP_ADDRESS.substring(half), 17,
+                R.font.outfit_medium, 0xFFFFFFFF);
+        address.setTypeface(android.graphics.Typeface.MONOSPACE);
+        address.setTextColor(getColorStateList(R.drawable.pill_text));
+        for (TextView t : new TextView[]{title, network, warning, address}) {
+            t.setDuplicateParentStateEnabled(true);
+            box.addView(t);
+        }
+        android.graphics.Bitmap code = PhoneUpload.qr(TIP_ADDRESS, dp(130));
+        if (code != null) {
+            android.widget.ImageView qr = new android.widget.ImageView(this);
+            qr.setImageBitmap(code);
+            qr.setScaleType(android.widget.ImageView.ScaleType.CENTER);
+            android.graphics.drawable.GradientDrawable white = new android.graphics.drawable.GradientDrawable();
+            white.setColor(0xFFFFFFFF);
+            white.setCornerRadius(dp(12));
+            qr.setBackground(white);
+            qr.setClipToOutline(true);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(code.getWidth(), code.getHeight());
+            lp.gravity = Gravity.CENTER_HORIZONTAL;
+            lp.topMargin = dp(14);
+            box.addView(qr, lp);
+        }
+        panel.addView(box);
     }
 
     // ---- screensaver ---------------------------------------------------------------------------------
@@ -271,6 +327,24 @@ public final class LauncherSettingsActivity extends Activity {
         lp.setMarginStart(gap);
         columns.addView(column, lp);
         return column;
+    }
+
+    /** The credit under the title: who made the launcher, and their X account with the X mark beside it. */
+    private View credits() {
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        line.setPadding(0, dp(4), 0, 0);
+        line.addView(text(getString(R.string.credits_made_by), 15, R.font.outfit_regular, 0xCCFFFFFF));
+        android.widget.ImageView mark = new android.widget.ImageView(this);
+        mark.setImageResource(R.drawable.ic_x_logo);
+        mark.setContentDescription("X");
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(20), dp(20));
+        lp.setMarginStart(dp(14));
+        lp.setMarginEnd(dp(7));
+        line.addView(mark, lp);
+        line.addView(text(getString(R.string.credits_x_handle), 15, R.font.outfit_medium, 0xFFFFFFFF));
+        return line;
     }
 
     /** A section: its title in small spaced capitals, and the glass panel its rows go into. */

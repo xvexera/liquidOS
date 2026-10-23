@@ -241,4 +241,9 @@
     <string name="wallpaper_uploads">רקעים שהועלו</string>
     <string name="wallpaper_upload_label">תמונה · %1$s</string>
     <string name="wallpaper_delete">מחיקה</string>
+    <string name="credits_made_by">נוצר בתשומת לב רבה לפרטים עבור המסך שלך על ידי Wade</string>
+    <string name="thanks_section">תודות</string>
+    <string name="thanks_title">רוצה להגיד תודה? 😊</string>
+    <string name="thanks_network">BTC או USDT · רשת BNB Smart Chain (BEP20)</string>
+    <string name="thanks_warning">⚠ חשוב: שלחו רק ב-BEP20 (BSC)</string>
 </resources>
