@@ -238,6 +238,14 @@ function Find-Tvs {
     return @($found.Values)
 }
 
+# The port a TV announces for Wireless debugging (a new one each time it is switched on); null if none.
+function Connect-Port([string]$ip) {
+    foreach ($line in (Adb mdns services) -split "`n") {
+        if ($line -match "_adb-tls-connect\._tcp\.?\s+$([regex]::Escape($ip)):(\d+)") { return $Matches[1] }
+    }
+    return $null
+}
+
 # The pairing port a TV announces while its "Pair device with pairing code" screen is open.
 function Pairing-Port([string]$ip) {
     foreach ($line in (Adb mdns services) -split "`n") {
@@ -503,6 +511,7 @@ function Wifi-Name {
 # is off the network. True once the network no longer belongs to setupwraith.
 function Rejoin-Wifi {
     $ssid = Wifi-Name
+    $ip = ($script:serial -split ':')[0]
     Box @('One quick thing on the TV, then liquidOS can be the Home screen.',
         '',
         "Google's setup app still owns the Wi-Fi network ""$ssid"". To hand it over:",
@@ -510,11 +519,15 @@ function Rejoin-Wifi {
         "1. On the TV: Settings > Network & Internet > ""$ssid"".",
         '2. Choose "Forget network" and confirm.',
         "3. Pick ""$ssid"" again from the list and type the Wi-Fi password.",
+        '4. IMPORTANT: changing the Wi-Fi turns debugging off. Go to Settings >',
+        '   Developer options and turn "Wireless debugging" (or "Network',
+        '   debugging" / "USB debugging") back on.',
         '',
-        'This PC loses the TV for a moment while you do it. That is normal:',
-        'leave this window open, it waits and reconnects by itself.') 1
+        'This PC loses the TV while you do it. That is normal: leave this window',
+        'open, it waits and reconnects by itself once debugging is back on.') 1
     if (-not (Yes 'Ready? I will wait here while you do it')) { return $false }
     $limit = 300
+    $away = 0
     for ($i = 0; ; $i++) {
         if ($i -ge $limit) {
             Write-Host ''
@@ -522,14 +535,24 @@ function Rejoin-Wifi {
             $limit += 300
         }
         $state = Last (Adb -s $script:serial get-state)
-        if ($state -ne 'device') {
-            Spin $i "The TV is off the network: join ""$ssid"" again on the TV..."
-            if ($i % 3 -eq 2) { Adb connect $script:serial | Out-Null }
+        if ($state -match 'unauthorized') {
+            Spin $i 'On the TV, accept "Allow debugging" (tick "Always allow")...'
+        } elseif ($state -ne 'device') {
+            $away++
+            if ($away -lt 20) { Spin $i "Waiting: re-join ""$ssid"" on the TV..." }
+            else { Spin $i 'Waiting: turn "Wireless debugging" / "Network debugging" back on in Developer options...' }
+            if ($i % 3 -eq 2) {
+                # Wireless debugging comes back on a new port each time it is switched on: look it up.
+                $port = Connect-Port $ip
+                if ($port) { $script:serial = "${ip}:$port" }
+                Adb connect $script:serial | Out-Null
+            }
         } elseif (-not (Wifi-Held)) {
-            Write-Host "`r                                                                          `r" -NoNewline
+            Write-Host "`r                                                                                          `r" -NoNewline
             Ok "The TV is back on ""$(Wifi-Name)"", and the network is the TV's own now"
             return $true
         } else {
+            $away = 0
             Spin $i 'Waiting: on the TV, forget the network and join it again...'
         }
         Start-Sleep -Seconds 1
