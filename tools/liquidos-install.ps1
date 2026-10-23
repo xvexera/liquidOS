@@ -541,7 +541,27 @@ function Rejoin-Wifi {
             $away++
             if ($away -lt 20) { Spin $i "Waiting: re-join ""$ssid"" on the TV..." }
             else { Spin $i 'Waiting: turn "Wireless debugging" / "Network debugging" back on in Developer options...' }
-            if ($i % 3 -eq 2) {
+            if ($away % 20 -eq 0) {
+                # 20 seconds away: the router may have given the TV another address. Look on the whole network.
+                $tvs = @(Find-Tvs)
+                if ($tvs.Count -eq 1) {
+                    $script:serial = "$($tvs[0].ip):$($tvs[0].port)"
+                    $ip = $tvs[0].ip
+                } elseif ($tvs.Count -gt 1) {
+                    Write-Host "`r                                                                                          `r" -NoNewline
+                    Info 'Found more than one TV on the network:'
+                    for ($k = 0; $k -lt $tvs.Count; $k++) {
+                        Paint ("     {0})  " -f ($k + 1)) $k -NoNewline
+                        Write-Host ("{0,-16} {1}" -f $tvs[$k].ip, $tvs[$k].kind) -ForegroundColor White
+                    }
+                    $a = Ask 'Which one is your TV? (Enter = keep waiting)'
+                    if ($a -match '^\d+$' -and [int]$a -ge 1 -and [int]$a -le $tvs.Count) {
+                        $script:serial = "$($tvs[[int]$a - 1].ip):$($tvs[[int]$a - 1].port)"
+                        $ip = $tvs[[int]$a - 1].ip
+                    }
+                }
+                Adb connect $script:serial | Out-Null
+            } elseif ($i % 3 -eq 2) {
                 # Wireless debugging comes back on a new port each time it is switched on: look it up.
                 $port = Connect-Port $ip
                 if ($port) { $script:serial = "${ip}:$port" }
