@@ -238,14 +238,6 @@ function Find-Tvs {
     return @($found.Values)
 }
 
-# The port a TV announces for Wireless debugging (a new one each time it is switched on); null if none.
-function Connect-Port([string]$ip) {
-    foreach ($line in (Adb mdns services) -split "`n") {
-        if ($line -match "_adb-tls-connect\._tcp\.?\s+$([regex]::Escape($ip)):(\d+)") { return $Matches[1] }
-    }
-    return $null
-}
-
 # The pairing port a TV announces while its "Pair device with pairing code" screen is open.
 function Pairing-Port([string]$ip) {
     foreach ($line in (Adb mdns services) -split "`n") {
@@ -333,6 +325,11 @@ function Pair([string]$ip) {
 
 function Connect-Tv {
     Show-Howto
+    Reconnect-Tv
+}
+
+# Lets the owner pick the TV (network scan, or its IP) and connects, pairing when needed; loops until it works.
+function Reconnect-Tv {
     while ($true) {
         $tv = Choose-Tv
         $script:serial = "$($tv.ip):$($tv.port)"
@@ -497,10 +494,15 @@ function Setup-Claims-Home {
 }
 function On-Wifi { return ((Sh 'ip route get 1.1.1.1') -match 'dev wlan') }
 # True when the TV is on Wi-Fi and the saved network belongs to setupwraith (or that cannot be read).
+# True when the TV is on Wi-Fi and the network it is on now belongs to setupwraith. Other saved networks do
+# not matter (losing them costs nothing now); a network whose owner cannot be read counts as held, to be safe.
 function Wifi-Held {
     if (-not (On-Wifi)) { return $false }
     $wifi = Sh 'dumpsys wifi'
-    return ($wifi -notmatch 'cname=' -or $wifi -match 'cname=[^ ]*setupwraith')
+    $at = $wifi.IndexOf('Currently Connected: true')
+    if ($at -lt 0) { return $true }
+    if ($wifi.Substring($at) -match 'cname=(\S+)') { return $Matches[1] -match 'setupwraith' }
+    return $true
 }
 function Wifi-Name {
     if ((Sh 'cmd wifi status') -match 'Wifi is connected to "([^"]+)"') { return $Matches[1] }
@@ -511,7 +513,6 @@ function Wifi-Name {
 # is off the network. True once the network no longer belongs to setupwraith.
 function Rejoin-Wifi {
     $ssid = Wifi-Name
-    $ip = ($script:serial -split ':')[0]
     Box @('One quick thing on the TV, then liquidOS can be the Home screen.',
         '',
         "Google's setup app still owns the Wi-Fi network ""$ssid"". To hand it over:",
@@ -523,59 +524,20 @@ function Rejoin-Wifi {
         '   Developer options and turn "Wireless debugging" (or "Network',
         '   debugging" / "USB debugging") back on.',
         '',
-        'This PC loses the TV while you do it. That is normal: leave this window',
-        'open, it waits and reconnects by itself once debugging is back on.') 1
-    if (-not (Yes 'Ready? I will wait here while you do it')) { return $false }
-    $limit = 300
-    $away = 0
-    for ($i = 0; ; $i++) {
-        if ($i -ge $limit) {
-            Write-Host ''
-            if (-not (Yes 'Still waiting. Keep waiting?')) { return $false }
-            $limit += 300
-        }
-        $state = Last (Adb -s $script:serial get-state)
-        if ($state -match 'unauthorized') {
-            Spin $i 'On the TV, accept "Allow debugging" (tick "Always allow")...'
-        } elseif ($state -ne 'device') {
-            $away++
-            if ($away -lt 20) { Spin $i "Waiting: re-join ""$ssid"" on the TV..." }
-            else { Spin $i 'Waiting: turn "Wireless debugging" / "Network debugging" back on in Developer options...' }
-            if ($away % 20 -eq 0) {
-                # 20 seconds away: the router may have given the TV another address. Look on the whole network.
-                $tvs = @(Find-Tvs)
-                if ($tvs.Count -eq 1) {
-                    $script:serial = "$($tvs[0].ip):$($tvs[0].port)"
-                    $ip = $tvs[0].ip
-                } elseif ($tvs.Count -gt 1) {
-                    Write-Host "`r                                                                                          `r" -NoNewline
-                    Info 'Found more than one TV on the network:'
-                    for ($k = 0; $k -lt $tvs.Count; $k++) {
-                        Paint ("     {0})  " -f ($k + 1)) $k -NoNewline
-                        Write-Host ("{0,-16} {1}" -f $tvs[$k].ip, $tvs[$k].kind) -ForegroundColor White
-                    }
-                    $a = Ask 'Which one is your TV? (Enter = keep waiting)'
-                    if ($a -match '^\d+$' -and [int]$a -ge 1 -and [int]$a -le $tvs.Count) {
-                        $script:serial = "$($tvs[[int]$a - 1].ip):$($tvs[[int]$a - 1].port)"
-                        $ip = $tvs[[int]$a - 1].ip
-                    }
-                }
-                Adb connect $script:serial | Out-Null
-            } elseif ($i % 3 -eq 2) {
-                # Wireless debugging comes back on a new port each time it is switched on: look it up.
-                $port = Connect-Port $ip
-                if ($port) { $script:serial = "${ip}:$port" }
-                Adb connect $script:serial | Out-Null
-            }
-        } elseif (-not (Wifi-Held)) {
-            Write-Host "`r                                                                                          `r" -NoNewline
+        'This PC loses the TV while you do it. That is normal.') 1
+    while ($true) {
+        Paint '   ? ' 5 -NoNewline
+        $ans = Read-Host 'Press Enter when the TV is back on Wi-Fi and debugging is on again (or type q to stop)'
+        if ($ans -match '^[qQ]') { return $false }
+        # The old connection is dead even when adb still lists it: drop it and find the TV again.
+        Adb disconnect $script:serial | Out-Null
+        Info 'Looking for the TV again (its address or port may have changed)...'
+        Reconnect-Tv
+        if (-not (Wifi-Held)) {
             Ok "The TV is back on ""$(Wifi-Name)"", and the network is the TV's own now"
             return $true
-        } else {
-            $away = 0
-            Spin $i 'Waiting: on the TV, forget the network and join it again...'
         }
-        Start-Sleep -Seconds 1
+        Warn "The TV is still on the network saved by Google's setup app. Forget ""$(Wifi-Name)"" on the TV and join it again (steps 1 to 4)."
     }
 }
 
