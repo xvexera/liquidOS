@@ -102,8 +102,26 @@ function Step([int]$n, [string]$title, [string]$what) {
     $host.UI.RawUI.WindowTitle = "liquidOS installer  -  step $n of $totalSteps  -  by Wade (@wade9_)"
 }
 
-# A double-line frame (box-drawing characters every console font has).
+# Splits text into lines of at most $max characters, at spaces, keeping a line's leading indent on its
+# continuation lines.
+function Wrap([string[]]$lines, [int]$max = 72) {
+    foreach ($line in $lines) {
+        if ($line.Length -le $max) { $line; continue }
+        $indent = ' ' * ($line.Length - $line.TrimStart().Length)
+        $cur = ''
+        foreach ($word in ($line.Trim() -split ' ')) {
+            $next = if ($cur) { "$cur $word" } else { "$indent$word" }
+            if ($next.Length -gt $max -and $cur) { $cur; $cur = "$indent$word" } else { $cur = $next }
+        }
+        if ($cur) { $cur }
+    }
+}
+
+# A double-line frame (box-drawing characters every console font has), never wider than the window.
 function Box([string[]]$lines, [int]$color = 5) {
+    $max = 72
+    try { $max = [math]::Max(40, [math]::Min(90, $host.UI.RawUI.WindowSize.Width - 10)) } catch { }
+    $lines = @(Wrap $lines $max)
     $w = ($lines | Measure-Object -Property Length -Maximum).Maximum + 2
     Paint ('   ╔' + ('═' * $w) + '╗') $color
     foreach ($l in $lines) {
@@ -433,9 +451,8 @@ function Plan-Debloat([string]$list, [string]$homePkg) {
     $pkgs = @($pkgs | Where-Object { $_ -ne $homePkg -and $knownStock -notcontains $_ -and $_ -ne $pkg })
     # The Wi-Fi network saved in the first-run wizard belongs to setupwraith, and Android deletes it when
     # setupwraith is disabled: the TV would drop off Wi-Fi (and the installer with it).
-    if ($pkgs -contains $setup) {
-        $wifi = Sh 'dumpsys wifi'
-        if ($wifi -notmatch 'cname=' -or $wifi -match 'cname=[^ ]*setupwraith') {
+    if ($pkgs -contains $setup -and (Setup-On)) {
+        if (Wifi-Held) {
             Info 'Keeping the Google setup app: the saved Wi-Fi belongs to it, and the TV would lose the network.'
             $pkgs = @($pkgs | Where-Object { $_ -ne $setup })
         }
@@ -459,6 +476,77 @@ function Debloat([string[]]$pkgs, [string]$rec) {
         if ($out -match 'disabled') { Add-Content $rec "disabled=$p"; Ok $p } else { Warn "$p : $(Last $out)" }
     }
     Write-Progress -Activity 'liquidOS debloater' -Completed
+}
+
+# ---- the Google setup app ----------------------------------------------------------------------------------
+# On Google TV, com.google.android.tungsten.setupwraith answers Home too (its RecoveryActivity): once the
+# factory launcher is off it takes Home instead of liquidOS. It has to be off first. But the Wi-Fi network
+# saved in the TV's first setup belongs to it, and turning it off deletes that network: the TV would drop off
+# Wi-Fi. Joining the network again from Settings makes the system its owner, and then it is safe.
+function Setup-On { return ((Sh "pm list packages -e $setup") -match [regex]::Escape("package:$setup")) }
+function Setup-Claims-Home {
+    return ((Sh 'cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME') -match [regex]::Escape("$setup/"))
+}
+function On-Wifi { return ((Sh 'ip route get 1.1.1.1') -match 'dev wlan') }
+# True when the TV is on Wi-Fi and the saved network belongs to setupwraith (or that cannot be read).
+function Wifi-Held {
+    if (-not (On-Wifi)) { return $false }
+    $wifi = Sh 'dumpsys wifi'
+    return ($wifi -notmatch 'cname=' -or $wifi -match 'cname=[^ ]*setupwraith')
+}
+function Wifi-Name {
+    if ((Sh 'cmd wifi status') -match 'Wifi is connected to "([^"]+)"') { return $Matches[1] }
+    return 'your Wi-Fi network'
+}
+
+# Walks the owner through forgetting and re-joining the Wi-Fi on the TV, reconnecting by itself while the TV
+# is off the network. True once the network no longer belongs to setupwraith.
+function Rejoin-Wifi {
+    $ssid = Wifi-Name
+    Box @('One quick thing on the TV, then liquidOS can be the Home screen.',
+        '',
+        "Google's setup app still owns the Wi-Fi network ""$ssid"". To hand it over:",
+        '',
+        "1. On the TV: Settings > Network & Internet > ""$ssid"".",
+        '2. Choose "Forget network" and confirm.',
+        "3. Pick ""$ssid"" again from the list and type the Wi-Fi password.",
+        '',
+        'This PC loses the TV for a moment while you do it. That is normal:',
+        'leave this window open, it waits and reconnects by itself.') 1
+    if (-not (Yes 'Ready? I will wait here while you do it')) { return $false }
+    $limit = 300
+    for ($i = 0; ; $i++) {
+        if ($i -ge $limit) {
+            Write-Host ''
+            if (-not (Yes 'Still waiting. Keep waiting?')) { return $false }
+            $limit += 300
+        }
+        $state = Last (Adb -s $script:serial get-state)
+        if ($state -ne 'device') {
+            Spin $i "The TV is off the network: join ""$ssid"" again on the TV..."
+            if ($i % 3 -eq 2) { Adb connect $script:serial | Out-Null }
+        } elseif (-not (Wifi-Held)) {
+            Write-Host "`r                                                                          `r" -NoNewline
+            Ok "The TV is back on ""$(Wifi-Name)"", and the network is the TV's own now"
+            return $true
+        } else {
+            Spin $i 'Waiting: on the TV, forget the network and join it again...'
+        }
+        Start-Sleep -Seconds 1
+    }
+}
+
+# Before the factory Home goes off: turn setupwraith off where it would take Home, safely for the Wi-Fi.
+function Free-Home([string]$rec) {
+    if (-not (Setup-On) -or -not (Setup-Claims-Home)) { return }
+    if (Wifi-Held) {
+        if (-not (Rejoin-Wifi)) {
+            Fail 'liquidOS is installed, but the TV still opens its own Home: the Wi-Fi was not re-joined.' 'Run the installer again and follow the Wi-Fi steps; nothing on the TV was changed in this step.'
+        }
+    }
+    $out = Sh "pm disable-user --user 0 $setup"
+    if ($out -match 'disabled') { Add-Content $rec "disabled=$setup"; Ok "Google's setup app turned off (it would take Home)" }
+    else { Warn "Could not turn off Google's setup app: $(Last $out)" }
 }
 
 # ---- Home --------------------------------------------------------------------------------------------------
@@ -488,7 +576,7 @@ function Hand-Over([string]$stock) {
         Sh "pm enable --user 0 $stock" | Out-Null
         Sh ('cmd package set-home-activity --user 0 $(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME ' + $stock + ' | tail -n 1)') | Out-Null
     }
-    Fail "The TV kept its own Home ($now); the factory Home is back on, nothing is broken." "On Google TV the Google setup app usually holds Home: on the TV forget the Wi-Fi network,`njoin it again from Settings, then run the installer again so the debloater can turn it off."
+    Fail "The TV kept its own Home ($now). The factory Home is back on: nothing is broken." 'Run the installer again. If it happens again, tell the person who gave you the installer which TV model this is.'
 }
 
 # ---- theme -------------------------------------------------------------------------------------------------
@@ -578,16 +666,17 @@ $walls = if ($theme) { @(Theme-Walls $theme) } else { @() }
 # Say what is about to happen, in plain words, before touching anything.
 Write-Host ''
 $debloatLine = if (-not $list) { 'no list for this model, nothing removed' } elseif ($plan.Count) { "turn off $($plan.Count) factory apps (they can come back)" } else { 'nothing to remove, already clean' }
-Box @("TV:            $model",
+Box (@("TV:            $model",
     '',
     'liquidOS will now:',
     '  ► Back up the TV first (apps, Home, settings) on this PC',
     "  ► Debloater:  $debloatLine",
     '  ► Install the liquidOS launcher and give it its permissions',
     '  ► Make the Home button open liquidOS',
+    $(if ($stock -ne 'none' -and (Setup-On) -and (Setup-Claims-Home) -and (Wifi-Held)) { '  ► Ask you to re-join the Wi-Fi on the TV once (it guides you)' } else { $null }),
     $(if ($theme) { "  ► Copy the theme $(Split-Path -Leaf $theme) with $($walls.Count) wallpapers" } else { '  ► (no theme to copy)' }),
     '',
-    'Nothing is deleted: option 2 of this installer puts it all back.') 0
+    'Nothing is deleted: option 2 of this installer puts it all back.') | Where-Object { $null -ne $_ }) 0
 if (-not (Yes 'Start?')) { Say '   Nothing was changed.' Gray; Bye 0 }
 
 $backupDir = Join-Path $repo ("backup\liquidos-{0}-{1}" -f ($script:serial -split ':')[0], (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -631,6 +720,7 @@ Write-Host "`r                                                            `r" -N
 Ok 'Optimized for speed'
 
 Step 7 'Make liquidOS the Home screen' 'The Home button on the remote will open liquidOS.'
+if ($stock -ne 'none') { Free-Home $rec }
 Hand-Over $stock
 
 Step 8 'Theme and wallpapers' 'Your look: dock apps, colours and wallpapers.'
