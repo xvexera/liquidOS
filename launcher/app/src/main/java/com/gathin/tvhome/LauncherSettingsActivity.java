@@ -103,7 +103,8 @@ public final class LauncherSettingsActivity extends Activity {
                 i -> choices.edit().putInt(Extras.WALLPAPER_DIM, DIM_STEPS[i]).apply());
 
         // Liquid Glass
-        LinearLayout glass = section(right, R.string.section_glass);
+        // Liquid Glass and motion share one panel: the glass and how it moves are tuned together.
+        LinearLayout glass = section(right, R.string.section_glass_motion);
         toggle(glass, getString(R.string.section_glass), getString(R.string.glass_hint), Extras.liquidGlass(this), on -> {
             choices.edit().putBoolean(Extras.LIQUID_GLASS, on).apply();
             enable(blurRow, on);
@@ -121,8 +122,8 @@ public final class LauncherSettingsActivity extends Activity {
         ((LinearLayout) blurRow).addView(zeroNote[0]);
         enable(blurRow, Extras.liquidGlass(this));
 
-        // Motion
-        LinearLayout motion = section(right, R.string.section_motion);
+        // Motion, in the same panel as the glass
+        LinearLayout motion = glass;
         boolean animations = config.animations;
         toggle(motion, getString(R.string.settings_animations), null, animations, on -> {
             choices.edit().putBoolean("animations", on).apply();

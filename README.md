@@ -1,3 +1,124 @@
+# liquidOS
+
+**A Liquid Glass home screen and debloater for Android TV and Google TV**, built by Wade
+([@wade9_](https://x.com/wade9_)) on top of [cleanyourtv](https://github.com/Gathin23/cleanyourtv) by Gathin.
+
+liquidOS turns a stock Google TV box (developed and tested on an onn. 4K Streaming Box, Google TV 14) into
+an Apple TV style home screen with frosted glass, widgets, night mode and a large wallpaper collection, and
+removes the factory ads and trackers. Everything happens over Wi-Fi from a Windows PC: no root, no cable,
+nothing uninstalled, and every change can be undone.
+
+> The screenshots below show the launcher in Spanish; it follows the TV's system language (English, Spanish
+> and Hebrew are included).
+
+<p align="center">
+  <img src="docs/liquidos/home.jpg" alt="liquidOS home screen with a rotating wallpaper and the glass dock" width="800">
+</p>
+
+| | |
+|---|---|
+| ![Home with the market widget](docs/liquidos/home-widgets.jpg) | ![Night mode panel](docs/liquidos/night-mode.jpg) |
+| **Widgets**: market ticker, now playing, calendar | **Night mode**: artificial dimming, warm light, real TV brightness |
+| ![Wallpaper menu](docs/liquidos/wallpaper-menu.jpg) | ![Upload a wallpaper from a phone](docs/liquidos/upload-from-phone.jpg) |
+| **Wallpapers** in folders: OLED black, rotating, colours, NASA, Retro, uploads | **Upload from phone**: scan the QR code, pick a photo, it becomes the wallpaper |
+| ![Calendar](docs/liquidos/calendar.jpg) | ![Launcher settings](docs/liquidos/settings.jpg) |
+| **Calendar** pill with the upcoming events of the TV's Google accounts | **Launcher settings**: home, icon packs, glass, motion, system |
+
+## Features
+
+### Home screen
+- **Liquid Glass** pills, dock and widgets: a blurred, refracting copy of the wallpaper behind every panel,
+  with an adjustable blur and a glass rim on the icons.
+- **Apple TV style focus**: a soft light follows the focused tile and the top buttons.
+- **Two icon packs**: *Stock* (each app's own banner) and *Glass* (the logo alone on frosted glass).
+- **Top bar**: calendar, night mode, Wi-Fi (icon only, crossed out when offline) and Settings.
+- **Glass clock** styles, greeting and date.
+
+### Widgets
+- **Market**: BTC, ETH, S&P 500 and more, with a 24 h sparkline.
+- **Now playing**: the music or video playing on the TV, with controls.
+- **Calendar**: upcoming events from the Google accounts signed in on the TV, with a reminder.
+
+### Night mode
+- **Artificial dimming** up to 100 % and **warm light** over every app.
+- **Real TV brightness** on TVs with their own panel (boxes on HDMI explain why it is not available).
+
+### Wallpapers
+- **None (OLED black)**, **background from the focused app's icon**, **rotating wallpapers** from Wikimedia
+  Commons by category (with the photo credit on screen), **colour gradients**, a **NASA** folder (Hubble and
+  Webb images, credited) and a **Retro** folder.
+- **Upload from phone**: the TV shows a QR code; the phone opens a page served by the TV on the home network,
+  picks a photo (or pastes a link), and the TV crops it to 16:9 and applies it at once. The page only works
+  while the QR code is on screen, carries a one-time token and accepts images only. Uploaded wallpapers get
+  their own folder with an **X** to delete each one.
+
+### Performance
+- About 100 MB of RAM on Home on a 2 GB box, 0 % CPU when idle.
+- Home is not rebuilt when you come back from an app unless apps were installed or removed, so returning
+  from YouTube takes about 120 to 150 ms.
+- Memory is let go when an app is in front (wallpaper released, garbage collected a few seconds later), and
+  rebuilding Home no longer leaks the previous copy.
+
+## liquidOS Installer
+
+A one-step installer for Windows: double-click **`liquidOS Installer.cmd`** and follow the screen.
+
+<p align="center">
+  <img src="docs/liquidos/installer.png" alt="liquidOS Installer in the Windows console: rainbow logo, DEBLOATER banner and the finish screen" width="560">
+</p>
+
+1. **Language**: English or Español (preselected from Windows).
+2. **Gets the PC ready**: finds ADB, or downloads Google's platform-tools by itself.
+3. **Finds the TV** on the network (or takes its address), and pairs with a code when the TV uses Wireless
+   debugging.
+4. **Shows what it will do** in plain words and asks before touching anything.
+5. **Backs the TV up** on the PC first: which apps are on and off, the Home app, the system settings, the TV
+   details, and optionally the APKs of the apps you installed.
+6. **Debloater**: turns off the factory ads, trackers and extras from that model's list (147 models in
+   `examples/`). Apps are disabled, never deleted. It keeps the Google setup app while it owns the saved
+   Wi-Fi network, and never touches the apps that drive the HDMI inputs.
+7. **Installs liquidOS** and grants its permissions (calendar, night mode, real brightness, now playing).
+8. **Makes liquidOS the Home screen** safely: it first checks that liquidOS starts, and if Home does not
+   take, the factory Home is put back so the TV is never left without one. On Google TV it walks you through
+   re-joining the Wi-Fi once when the Google setup app still owns the network.
+9. **Copies a theme** with its wallpapers.
+
+**Undo**: open the installer again and choose 2. It reads the backup and turns the factory apps and the
+factory Home back on.
+
+### Requirements
+- A Windows 10 or 11 PC on the same Wi-Fi as the TV.
+- On the TV: *Settings > System > About*, press *Build* 7 times, then turn on *USB debugging* (and *Network
+  debugging* or *Wireless debugging* if your TV has it). Turn debugging off again when you are done.
+
+To build the app yourself: `launcher\build-and-install.ps1` (JDK 17 and the Android SDK).
+
+## Credits
+
+- **liquidOS**: crafted with great attention to detail by **Wade** ([@wade9_](https://x.com/wade9_)).
+- **Based on [cleanyourtv](https://github.com/Gathin23/cleanyourtv)** by **Gathin** (MIT license, see
+  [LICENSE](LICENSE)): the launcher it grew from, the debloat lists, the theme tools and the safety rules for
+  Google TV. The original README follows below.
+- Wallpapers: NASA, ESA, CSA, STScI (Hubble and Webb images) and Wikimedia Commons photographers, credited on
+  screen.
+
+## Support
+
+Everything here is free. Want to say thanks? 😊
+
+**BTC or USDT, on BNB Smart Chain (BEP20) only**:
+
+```
+0x612bd350dd82edc6772b375a5c534540439a9ef7
+```
+
+> ⚠ Send on **BEP20 (BSC)** only. This address does not take Bitcoin sent on the Bitcoin network.
+
+---
+
+
+# The original cleanyourtv README
+
 <p align="center">
   <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
 </p>

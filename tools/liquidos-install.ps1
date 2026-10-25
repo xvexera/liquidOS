@@ -280,10 +280,10 @@ function Choose-Tv {
             if (Yes (T 'Search again?' '¿Buscar de nuevo?')) { continue }
         }
         while ($true) {
-            $ip = Ask (T 'TV IP address (Settings > Network on the TV, e.g. 192.168.0.50)' 'IP de la TV (Ajustes > Red en la TV, por ejemplo 192.168.0.50)')
+            $ip = Ask (T 'TV IP address (shown on the TV under Settings > Network)' 'IP de la TV (la muestra la TV en Ajustes > Red)')
             if ($ip -match '^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$' -and
                 -not (@($Matches[1..4]) | Where-Object { [int]$_ -gt 255 })) { break }
-            Warn (T "'$ip' does not look like an IP address. It has four numbers with dots, like 192.168.0.50." "'$ip' no parece una IP. Son cuatro números con puntos, como 192.168.0.50.")
+            Warn (T "'$ip' does not look like an IP address: it is four numbers separated by dots." "'$ip' no parece una IP: son cuatro números separados por puntos.")
         }
         $port = Ask (T 'Port (Enter = 5555; on "Wireless debugging" TVs it is the number after the colon)' 'Puerto (Enter = 5555; en TVs con "Depuración inalámbrica" es el número después de los dos puntos)') '5555'
         return [pscustomobject]@{ ip = $ip; port = $port; kind = 'typed' }

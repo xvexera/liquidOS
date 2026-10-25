@@ -206,4 +206,5 @@
     <string name="thanks_title">¿Quieres agradecerme? 😊</string>
     <string name="thanks_network">BTC o USDT · red BNB Smart Chain (BEP20)</string>
     <string name="thanks_warning">⚠ IMPORTANTE: envía solo por BEP20 (BSC)</string>
+    <string name="section_glass_motion">Liquid Glass y movimiento</string>
 </resources>

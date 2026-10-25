@@ -246,4 +246,5 @@
     <string name="thanks_title">רוצה להגיד תודה? 😊</string>
     <string name="thanks_network">BTC או USDT · רשת BNB Smart Chain (BEP20)</string>
     <string name="thanks_warning">⚠ חשוב: שלחו רק ב-BEP20 (BSC)</string>
+    <string name="section_glass_motion">Liquid Glass ותנועה</string>
 </resources>
