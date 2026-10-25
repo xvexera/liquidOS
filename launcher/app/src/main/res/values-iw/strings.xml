@@ -247,4 +247,5 @@
     <string name="thanks_network">BTC או USDT · רשת BNB Smart Chain (BEP20)</string>
     <string name="thanks_warning">⚠ חשוב: שלחו רק ב-BEP20 (BSC)</string>
     <string name="section_glass_motion">Liquid Glass ותנועה</string>
+    <string name="credits_based_on">מבוסס על cleanyourtv מאת Gathin · רישיון MIT</string>
 </resources>

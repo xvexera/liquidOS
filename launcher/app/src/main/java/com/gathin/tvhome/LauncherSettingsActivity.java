@@ -62,6 +62,10 @@ public final class LauncherSettingsActivity extends Activity {
 
         content.addView(text(getString(R.string.launcher_settings), 34, R.font.outfit_light, 0xFFFFFFFF));
         content.addView(credits());
+        // The project it grew from, as its MIT license asks: small and dim under the author's line.
+        TextView basedOn = text(getString(R.string.credits_based_on), 12, R.font.outfit_regular, 0x80FFFFFF);
+        basedOn.setPadding(0, dp(2), 0, 0);
+        content.addView(basedOn);
         TextView subtitle = text(getString(R.string.settings_subtitle), 14, R.font.outfit_regular, 0x99FFFFFF);
         subtitle.setPadding(0, dp(6), 0, 0);
         content.addView(subtitle);

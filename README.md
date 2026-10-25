@@ -110,6 +110,17 @@ To build the app yourself: `launcher\build-and-install.ps1` (JDK 17 and the Andr
 - Wallpapers: NASA, ESA, CSA, STScI (Hubble and Webb images) and Wikimedia Commons photographers, credited on
   screen.
 
+## License
+
+MIT, see [LICENSE](LICENSE): Copyright (c) 2026 Gathin (cleanyourtv) and Copyright (c) 2026 Wade (liquidOS).
+You may use, copy, change and share it, as long as both copyright notices and the license text stay with it.
+The libraries and the font bundled in the app keep their own licenses (Apache 2.0 and SIL OFL 1.1), listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+**Not affiliated** with Apple, Google, Samsung, Walmart (onn.) or X Corp. "Liquid Glass", "Apple TV", "Google
+TV", "Android TV", "onn." and the other names and logos shown belong to their owners and are used only to
+describe compatibility or to link to an account.
+
 ## Support
 
 Everything here is free. Want to say thanks? 😊
