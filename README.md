@@ -23,14 +23,22 @@ nothing uninstalled, and every change can be undone.
 | **Wallpapers** in folders: OLED black, rotating, colours, NASA, Retro, uploads | **Upload from phone**: scan the QR code, pick a photo, it becomes the wallpaper |
 | ![Calendar](docs/liquidos/calendar.jpg) | ![Launcher settings](docs/liquidos/settings.jpg) |
 | **Calendar** pill with the upcoming events of the TV's Google accounts | **Launcher settings**: home, icon packs, glass, motion, system |
+| ![Liquid Glass icons](docs/liquidos/glass-icons.jpg) | ![Thanks panel](docs/liquidos/thanks.jpg) |
+| **Liquid Glass icons**: each app's logo alone on frosted glass (some apps' icons may not look right yet) | **Credits and thanks** inside Launcher settings |
 
 ## Features
 
 ### Home screen
 - **Liquid Glass** pills, dock and widgets: a blurred, refracting copy of the wallpaper behind every panel,
   with an adjustable blur and a glass rim on the icons.
+- **Real-time glass (Advanced effects)**: by default the dock's refraction is worked out once and reused, with
+  a plain blur while you scroll, which keeps a small box fast. Turn on *Advanced effects* (Launcher settings >
+  Liquid Glass and motion) and the glass is rendered again on every frame while things move, with lifted cards
+  and larger icons: it looks smoother and more alive, but it uses more GPU and memory, so it depends on the TV.
 - **Apple TV style focus**: a soft light follows the focused tile and the top buttons.
-- **Two icon packs**: *Stock* (each app's own banner) and *Glass* (the logo alone on frosted glass).
+- **Two icon packs**: *Stock* (each app's own banner) and *Liquid Glass* (the logo alone on frosted glass).
+  The Glass pack cuts each app's logo out of its banner or icon, so a few apps can come out wrong (cropped,
+  too dark or with leftover background); switch back to Stock if one looks off.
 - **Top bar**: calendar, night mode, Wi-Fi (icon only, crossed out when offline) and Settings.
 - **Glass clock** styles, greeting and date.
 
@@ -98,7 +106,7 @@ To build the app yourself: `launcher\build-and-install.ps1` (JDK 17 and the Andr
 - **liquidOS**: crafted with great attention to detail by **Wade** ([@wade9_](https://x.com/wade9_)).
 - **Based on [cleanyourtv](https://github.com/Gathin23/cleanyourtv)** by **Gathin** (MIT license, see
   [LICENSE](LICENSE)): the launcher it grew from, the debloat lists, the theme tools and the safety rules for
-  Google TV. The original README follows below.
+  Google TV. The original README is folded at the end of this page.
 - Wallpapers: NASA, ESA, CSA, STScI (Hubble and Webb images) and Wikimedia Commons photographers, credited on
   screen.
 
@@ -117,32 +125,14 @@ Everything here is free. Want to say thanks? 😊
 ---
 
 
-# The original cleanyourtv README
+## About cleanyourtv
 
-<p align="center">
-  <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
-</p>
+liquidOS stands on [cleanyourtv](https://github.com/Gathin23/cleanyourtv) by Gathin: the original project that
+strips the bloatware from Android TV and Google TV over Wi-Fi and replaces the stock home screen, with debloat
+lists for 147 TV models. Its documentation is kept below, folded, for the tools and the per-model notes.
 
-<p align="center">
-  <a href="https://github.com/Gathin23/cleanyourtv/stargazers"><img src="https://img.shields.io/github/stars/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Stars"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/pulls?q=is%3Amerged"><img src="https://img.shields.io/github/issues-pr-closed/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&label=merged%20PRs&color=cfffcf&labelColor=15181e" alt="Merged PRs"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/network/members"><img src="https://img.shields.io/github/forks/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Forks"></a>
-  <a href="https://github.com/Gathin23/cleanyourtv/graphs/contributors"><img src="https://img.shields.io/github/contributors/Gathin23/cleanyourtv?style=flat&cacheSeconds=1800&color=cfffcf&labelColor=15181e" alt="Contributors"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/README-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-cfffcf?style=flat&labelColor=15181e" alt="简体中文"></a>
-  <a href="https://buymeacoffee.com/gathint"><img src="https://img.shields.io/badge/support-%E2%9D%A4-ff5e8a?style=flat&labelColor=15181e" alt="Support, buy me a coffee"></a>
-  <a href="https://www.producthunt.com/products/cleanyourtv"><img src="https://img.shields.io/badge/Product%20Hunt-launching%20Oct%2021-da552f?style=flat&logo=producthunt&logoColor=white&labelColor=15181e" alt="CleanYourTV on Product Hunt"></a>
-</p>
-
-<p align="center">
-  <a href="docs/PRESS.md"><img src="docs/card.jpg" alt="147 TV models · 49 brands · 21 languages · 405 KB launcher. Featured in TechCrunch, TechRadar, Tom's Guide, Mashable, Android Authority, XDA, FlatpanelsHD, It's FOSS, Phandroid, GIGAZINE, Xataka, WinFuture, Frandroid, Macitynet, Techaeris, TechPP and 57 more: 73 articles from 21 countries. Before: stock Google TV home with a sponsored ad. After: the Clean Your TV launcher." width="800"></a>
-</p>
-
-> Vibe coded my parents' TV this afternoon! It was showing a sponsored ad before you could even get
-> to Netflix. Gave Claude Code the model number, it found the TV on wifi, removed 25 Xiaomi packages
-> and wrote a new launcher. Looks like an Apple TV now lol.
->
-> [@gathint, 17 October 2026](https://x.com/gathint/status/2111379569030939102). The replies are where
-> most of the TV lists here came from. The repo was called tv-vibehack until the 19th; old links work.
+<details>
+<summary><b>The original cleanyourtv README</b> (click to open)</summary>
 
 ## How it works
 
@@ -564,3 +554,5 @@ Security issues: report them privately through the [Security tab](https://github
 
 MIT, see [`LICENSE`](LICENSE). The Outfit typeface is under the SIL Open Font License, see
 `launcher/FONT-LICENSE-OFL.txt`.
+
+</details>
