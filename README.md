@@ -23,8 +23,8 @@ nothing uninstalled, and every change can be undone.
 | **Wallpapers** in folders: OLED black, rotating, colours, NASA, Retro, uploads | **Upload from phone**: scan the QR code, pick a photo, it becomes the wallpaper |
 | ![Calendar](docs/liquidos/calendar.jpg) | ![Launcher settings](docs/liquidos/settings.jpg) |
 | **Calendar** pill with the upcoming events of the TV's Google accounts | **Launcher settings**: home, icon packs, glass, motion, system |
-| ![Liquid Glass icons](docs/liquidos/glass-icons.jpg) | ![Thanks panel](docs/liquidos/thanks.jpg) |
-| **Liquid Glass icons**: each app's logo alone on frosted glass (some apps' icons may not look right yet) | **Credits and thanks** inside Launcher settings |
+| ![Liquid Glass icons](docs/liquidos/glass-icons.jpg) | |
+| **Liquid Glass icons**: each app's logo alone on frosted glass (some apps' icons may not look right yet) | |
 
 ## Features
 
