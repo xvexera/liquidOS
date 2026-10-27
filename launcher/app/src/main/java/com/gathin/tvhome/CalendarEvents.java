@@ -147,7 +147,7 @@ final class CalendarEvents {
 
     private static long dayKey(Event e) {
         ZoneId zone = e.allDay ? ZoneOffset.UTC : ZoneId.systemDefault();
-        return LocalDate.ofInstant(Instant.ofEpochMilli(e.begin), zone).toEpochDay();
+        return Instant.ofEpochMilli(e.begin).atZone(zone).toLocalDate().toEpochDay();
     }
 
     /** "Now", "Today · 18:30", "Tomorrow · All day", "Fri · 10:00", "24 Oct · 10:00". */
@@ -155,7 +155,7 @@ final class CalendarEvents {
         long now = System.currentTimeMillis();
         if (!e.allDay && e.begin <= now && e.end > now) return ctx.getString(R.string.calendar_now);
         LocalDate today = LocalDate.now();
-        LocalDate day = LocalDate.ofInstant(Instant.ofEpochMilli(e.begin), e.allDay ? ZoneOffset.UTC : ZoneId.systemDefault());
+        LocalDate day = Instant.ofEpochMilli(e.begin).atZone(e.allDay ? ZoneOffset.UTC : ZoneId.systemDefault()).toLocalDate();
         String dayLabel;
         if (day.equals(today)) dayLabel = ctx.getString(R.string.calendar_today);
         else if (day.equals(today.plusDays(1))) dayLabel = ctx.getString(R.string.calendar_tomorrow);

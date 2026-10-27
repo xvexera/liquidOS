@@ -180,9 +180,9 @@ public final class LauncherSettingsActivity extends Activity {
         box.setBackgroundResource(R.drawable.input_row_bg);
         box.setFocusable(true);
         TextView title = text(getString(R.string.thanks_title), 20, R.font.outfit_medium, 0xFFFFFFFF);
-        title.setTextColor(getColorStateList(R.drawable.pill_text));
+        title.setTextColor(getColorStateList(R.color.pill_text));
         TextView network = text(getString(R.string.thanks_network), 13, R.font.outfit_regular, 0xFFFFFFFF);
-        network.setTextColor(getColorStateList(R.drawable.pill_text_dim));
+        network.setTextColor(getColorStateList(R.color.pill_text_dim));
         network.setPadding(0, dp(4), 0, 0);
         // Yellow, and a darker amber on the focused (white) row so it stays readable.
         TextView warning = text(getString(R.string.thanks_warning), 14, R.font.outfit_medium, 0xFFFFD60A);
@@ -193,7 +193,7 @@ public final class LauncherSettingsActivity extends Activity {
         TextView address = text(TIP_ADDRESS.substring(0, half) + "\n" + TIP_ADDRESS.substring(half), 17,
                 R.font.outfit_medium, 0xFFFFFFFF);
         address.setTypeface(android.graphics.Typeface.MONOSPACE);
-        address.setTextColor(getColorStateList(R.drawable.pill_text));
+        address.setTextColor(getColorStateList(R.color.pill_text));
         for (TextView t : new TextView[]{title, network, warning, address}) {
             t.setDuplicateParentStateEnabled(true);
             box.addView(t);
@@ -390,12 +390,12 @@ public final class LauncherSettingsActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.setDuplicateParentStateEnabled(true);
         TextView t = text(title, 17, R.font.outfit_medium, 0xFFFFFFFF);
-        t.setTextColor(getColorStateList(R.drawable.pill_text));
+        t.setTextColor(getColorStateList(R.color.pill_text));
         t.setDuplicateParentStateEnabled(true);
         texts.addView(t);
         if (hint != null) {
             TextView h = text(hint, 12, R.font.outfit_regular, 0xFFFFFFFF);
-            h.setTextColor(getColorStateList(R.drawable.pill_text_dim));
+            h.setTextColor(getColorStateList(R.color.pill_text_dim));
             h.setDuplicateParentStateEnabled(true);
             h.setPadding(0, dp(3), dp(24), 0);
             texts.addView(h);
@@ -431,7 +431,7 @@ public final class LauncherSettingsActivity extends Activity {
     private View stepper(LinearLayout panel, String title, String hint, String[] values, int at,
                          java.util.function.IntConsumer changed) {
         TextView value = text("", 17, R.font.outfit_medium, 0xFFFFFFFF);
-        value.setTextColor(getColorStateList(R.drawable.pill_text));
+        value.setTextColor(getColorStateList(R.color.pill_text));
         int[] index = {Math.max(0, Math.min(values.length - 1, at))};
         boolean[] editing = {false};
         Runnable show = () -> {
@@ -440,7 +440,7 @@ public final class LauncherSettingsActivity extends Activity {
                 value.setTextColor(0xFF0A84FF);
             } else {
                 value.setText(values[index[0]] + "   \u203A");
-                value.setTextColor(getColorStateList(R.drawable.pill_text));
+                value.setTextColor(getColorStateList(R.color.pill_text));
             }
         };
         show.run();
@@ -517,7 +517,7 @@ public final class LauncherSettingsActivity extends Activity {
 
     private void action(LinearLayout panel, String title, String hint, Runnable run) {
         TextView chevron = text("›", 22, R.font.outfit_light, 0xFFFFFFFF);
-        chevron.setTextColor(getColorStateList(R.drawable.pill_text_dim));
+        chevron.setTextColor(getColorStateList(R.color.pill_text_dim));
         row(panel, title, hint, chevron).setOnClickListener(v -> run.run());
     }
 

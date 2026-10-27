@@ -3215,7 +3215,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         every.setPaddingRelative(every.getPaddingStart() + indent, 0, every.getPaddingEnd(), 0);
         TextView value = every.findViewById(R.id.status);
         value.setTextSize(15f);
-        value.setTextColor(getColorStateList(R.drawable.pill_text));
+        value.setTextColor(getColorStateList(R.color.pill_text));
         value.setText(stepperLabel(OnlineWallpapers.intervalMinutes(this)));
         java.util.function.IntConsumer step = by -> {
             int[] all = OnlineWallpapers.INTERVALS;
@@ -3470,7 +3470,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View row = menuRow(getString(title), "");
         TextView value = row.findViewById(R.id.status);
         value.setTextSize(15f);
-        value.setTextColor(getColorStateList(R.drawable.pill_text));
+        value.setTextColor(getColorStateList(R.color.pill_text));
         Runnable show = () -> {
             int days = current.applyAsInt(this);
             value.setText("\u2039  " + getResources().getQuantityString(R.plurals.calendar_days, days, days) + "  \u203A");
