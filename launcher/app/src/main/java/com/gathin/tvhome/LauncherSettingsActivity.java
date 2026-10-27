@@ -112,6 +112,12 @@ public final class LauncherSettingsActivity extends Activity {
         toggle(glass, getString(R.string.section_glass), getString(R.string.glass_hint), Extras.liquidGlass(this), on -> {
             choices.edit().putBoolean(Extras.LIQUID_GLASS, on).apply();
             enable(blurRow, on);
+            // Advanced effects are glass effects: they go off with the glass, and come back only by choice.
+            if (!on) {
+                choices.edit().putBoolean("advanced_effects", false).apply();
+                advancedToggle.setChecked(false, true);
+            }
+            enable(advancedRow, on && choices.getBoolean("animations", config.animations));
         });
         TextView[] zeroNote = {null};
         blurRow = slider(glass, getString(R.string.settings_blur), getString(R.string.settings_blur_hint),
@@ -135,12 +141,12 @@ public final class LauncherSettingsActivity extends Activity {
                 choices.edit().putBoolean("advanced_effects", false).apply();
                 advancedToggle.setChecked(false, true);
             }
-            enable(advancedRow, on);
+            enable(advancedRow, on && Extras.liquidGlass(this));
         });
         advancedRow = toggle(motion, getString(R.string.advanced_effects), getString(R.string.advanced_effects_warning),
                 animations && config.advancedEffects, on -> choices.edit().putBoolean("advanced_effects", on).apply());
         advancedToggle = (GlassToggle) ((ViewGroup) advancedRow).getChildAt(1);
-        enable(advancedRow, animations);
+        enable(advancedRow, animations && Extras.liquidGlass(this));
 
         // Thanks: how to tip the author, right under Motion where it is seen.
         thanks(right);
