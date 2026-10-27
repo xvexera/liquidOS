@@ -101,6 +101,26 @@ factory Home back on.
 
 To build the app yourself: `launcher\build-and-install.ps1` (JDK 17 and the Android SDK).
 
+## Privacy
+
+**liquidOS collects nothing.** No accounts, no analytics, no ads, no crash reporting, no tracking of any kind,
+and no server of mine that your TV or PC talks to. The code is open, so anyone can check.
+
+- **Everything stays on the TV**: your settings, uploaded wallpapers and calendar events never leave it. The
+  calendar is read on the TV only to show your next events.
+- **The only internet requests** go straight from the TV to public services, without any personal data, and
+  only when you use those features:
+  - **Wikimedia Commons**, for the rotating wallpapers.
+  - **Binance** and **Yahoo Finance**, for the prices in the market widget (only when the widget is on).
+  - **A link you paste yourself** when uploading a wallpaper from your phone.
+- **Upload from phone** works only on your home network: the TV serves the page itself, only while the QR code
+  is on screen, with a one-time code. Nothing goes through the internet.
+- **Location permission** is only how Android lets an app read the Wi-Fi network's name for the top bar. liquidOS
+  never reads where you are.
+- **The installer** runs on your PC and talks only to your TV on your network. It downloads Google's ADB tools
+  from Google if they are missing. Backups are saved in a folder on your PC and are never uploaded.
+- **The debloater** turns off the TV's factory trackers and ads: it shares less with the TV maker, not more.
+
 ## Credits
 
 - **liquidOS**: crafted with great attention to detail by **Wade** ([@wade9_](https://x.com/wade9_)).
