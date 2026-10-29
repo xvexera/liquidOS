@@ -29,9 +29,9 @@ import java.util.List;
 
 /**
  * The Continue watching cards, in the widgets row (HomeWidgets places and orders them): the newest videos of
- * WatchHistory, each with its picture, title, how far it got and an X that takes it off. OK on a card opens the video
- * again, at the same point where the app allows it. Rebuilt in start() from onResume, so a video paused a moment ago
- * is there.
+ * WatchHistory, each with its picture, title and how far it got. OK on a card opens the video again, at the same point
+ * where the app allows it; Down from a card reaches the X under it, which takes it off. Rebuilt in start() from
+ * onResume, so a video paused a moment ago is there.
  */
 final class ContinueRow {
     /** The widgets row: moves focus along it and out of it. */
@@ -57,8 +57,7 @@ final class ContinueRow {
     private final boolean advanced;
     private final Host host;
     private final List<View> cards = new ArrayList<>();
-    /** Every focusable of the cards in order: each card, then its X. */
-    private final List<View> stops = new ArrayList<>();
+
 
     ContinueRow(Activity activity, float density, boolean liquidGlass, boolean advanced, Host host) {
         this.activity = activity;
@@ -77,8 +76,9 @@ final class ContinueRow {
         return row != null && !cards.isEmpty();
     }
 
+    /** The cards, left to right: what Left and Right move between (the X under each is reached with Down). */
     List<View> stops() {
-        return stops;
+        return cards;
     }
 
     /** Repaints the glass cards, after the blurred backdrop behind them (or their place on screen) changed. */
@@ -90,12 +90,12 @@ final class ContinueRow {
         if (row == null) return;
         row.removeAllViews();
         cards.clear();
-        stops.clear();
         if (Extras.continueWatching(activity)) {
             for (WatchHistory.Entry e : WatchHistory.load(activity)) {
                 if (cards.size() == MAX_CARDS) break;
                 if (!installed(e.pkg) || !WatchHistory.appOn(activity, e.pkg)) continue;
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(300), dp(84));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
                 if (!cards.isEmpty()) lp.setMarginStart(dp(14));
                 row.addView(card(e), lp);
             }
@@ -154,7 +154,7 @@ final class ContinueRow {
         title.setPadding(0, dp(2), 0, 0);
         texts.addView(title);
 
-        // The time left, a short glass track with a white fill, and the X that removes the card.
+        // The time left and a glass track with a white fill.
         LinearLayout bottom = new LinearLayout(activity);
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
@@ -173,24 +173,37 @@ final class ContinueRow {
         track.addView(new View(activity), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT,
                 Math.max(1, 100 - e.percent())));
         LinearLayout.LayoutParams trl = new LinearLayout.LayoutParams(0, dp(3), 1f);
-        trl.setMarginStart(dp(8));
-        trl.setMarginEnd(dp(8));
+        trl.setMarginStart(dp(10));
         bottom.addView(track, trl);
+
+        // The X sits under the card, over its lower edge, and shows only while the card or the X has focus.
         View remove = removeButton();
-        bottom.addView(remove, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        remove.setAlpha(0f);
+        Runnable showRemove = () -> remove.animate().alpha(card.hasFocus() || remove.hasFocus() ? 1f : 0f)
+                .setDuration(120).start();
 
         card.setContentDescription(e.title);
         card.setOnFocusChangeListener((v, focused) -> {
+            showRemove.run();
             if (!advanced) return;   // the background's own cross-fade is the whole animation
             v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(140)
                     .setUpdateListener(a -> v.invalidate()).start();
         });
-        card.setOnKeyListener((v, keyCode, event) -> onKey(v, keyCode, event, () -> open(e)));
-        remove.setOnKeyListener((v, keyCode, event) -> onKey(v, keyCode, event, () -> remove(e)));
+        remove.setOnFocusChangeListener((v, focused) -> showRemove.run());
+        card.setOnKeyListener((v, keyCode, event) -> onKey(card, remove, keyCode, event, false, () -> open(e)));
+        remove.setOnKeyListener((v, keyCode, event) -> onKey(card, remove, keyCode, event, true, () -> remove(e)));
         cards.add(card);
-        stops.add(card);
-        stops.add(remove);
-        return card;
+
+        LinearLayout item = new LinearLayout(activity);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER_HORIZONTAL);
+        item.setClipChildren(false);
+        item.setClipToPadding(false);
+        item.addView(card, new LinearLayout.LayoutParams(dp(300), dp(84)));
+        LinearLayout.LayoutParams xl = new LinearLayout.LayoutParams(dp(30), dp(30));
+        xl.topMargin = -dp(12);
+        item.addView(remove, xl);
+        return item;
     }
 
     /** A small glass circle with an X; white with a dark X while focused, like the other buttons. */
@@ -198,10 +211,10 @@ final class ContinueRow {
         ImageView x = new ImageView(activity);
         x.setImageResource(R.drawable.ic_close);
         x.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        x.setPadding(dp(6), dp(6), dp(6), dp(6));
+        x.setPadding(dp(8), dp(8), dp(8), dp(8));
         StateListDrawable bg = new StateListDrawable();
         bg.addState(new int[]{android.R.attr.state_focused}, oval(0xFFFFFFFF));
-        bg.addState(new int[0], oval(0x33FFFFFF));
+        bg.addState(new int[0], oval(0xCC2C2C2E));
         bg.setEnterFadeDuration(90);
         bg.setExitFadeDuration(90);
         x.setBackground(bg);
@@ -213,8 +226,11 @@ final class ContinueRow {
         return x;
     }
 
-    /** OK runs {@code action}; Left and Right move along the whole widgets row, Up and Down leave it. */
-    private boolean onKey(View v, int keyCode, KeyEvent event, Runnable action) {
+    /**
+     * OK runs {@code action}. Left and Right move along the whole widgets row, from the card. On the card Down goes to
+     * its X and Up leaves the row; on the X Up goes back to the card and Down leaves the row.
+     */
+    private boolean onKey(View card, View remove, int keyCode, KeyEvent event, boolean onRemove, Runnable action) {
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -223,13 +239,19 @@ final class ContinueRow {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (down) host.step(v, keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
+                if (down) host.step(card, keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (down) host.up();
+                if (down) {
+                    if (onRemove) card.requestFocus();
+                    else host.up();
+                }
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (down) host.down();
+                if (down) {
+                    if (onRemove) host.down();
+                    else remove.requestFocus();
+                }
                 return true;
             default:
                 return false;

@@ -76,6 +76,8 @@ final class HomeWidgets {
         this.focusTopBar = focusTopBar;
         row = activity.findViewById(R.id.widgets);
         scroll = activity.findViewById(R.id.widgetsScroll);
+        // Cards of different heights (Continue watching has its X under it) line up at the top.
+        if (row != null) row.setBaselineAligned(false);
         continueRow = new ContinueRow(activity, density, liquidGlass, advanced, new ContinueRow.Host() {
             @Override
             public void step(View from, int direction) {
@@ -235,7 +237,7 @@ final class HomeWidgets {
             } else {
                 ((TextView) activity.findViewById(R.id.btcPrice)).setText("\u2014");
                 ((TextView) activity.findViewById(R.id.btcChange)).setText("");
-                spark.setVisibility(View.GONE);
+                spark.setVisibility(Extras.marketChart(activity) ? View.INVISIBLE : View.GONE);
             }
         };
         if (!fade) {
@@ -396,9 +398,10 @@ final class HomeWidgets {
                 Math.abs(q.changePercent), period));
         change.setTextColor(up ? UP_COLOR : DOWN_COLOR);
         SparklineView spark = activity.findViewById(R.id.btcSpark);
-        boolean chart = q.history != null && Extras.marketChart(activity);
-        spark.setVisibility(chart ? View.VISIBLE : View.GONE);
-        if (chart) spark.setValues(q.history, up ? UP_COLOR : DOWN_COLOR);
+        // The chart keeps its place while an asset has no history yet, so the card does not change size.
+        boolean chart = Extras.marketChart(activity);
+        spark.setVisibility(!chart ? View.GONE : q.history != null ? View.VISIBLE : View.INVISIBLE);
+        if (chart && q.history != null) spark.setValues(q.history, up ? UP_COLOR : DOWN_COLOR);
     }
 
     // ---- Now playing -------------------------------------------------------------------------------

@@ -303,7 +303,7 @@
                  only when switched on in Launcher settings; the row is gone when both are. -->
             <!-- The widgets row slides sideways when its cards do not fit. Padded so a zoomed card is not clipped,
                  pulled back by the same amount so the cards line up with the clock. -->
-            <HorizontalScrollView
+            <com.gathin.tvhome.GlideScrollView
                 android:id="@+id/widgetsScroll"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -344,7 +344,7 @@
                     android:visibility="gone">
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="124dp"
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
@@ -380,10 +380,14 @@
 
                         <TextView
                             android:id="@+id/btcPrice"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_width="match_parent"
+                            android:layout_height="30dp"
+                            android:autoSizeTextType="uniform"
+                            android:autoSizeMinTextSize="14sp"
+                            android:autoSizeMaxTextSize="24sp"
                             android:layout_marginTop="4dp"
-                            android:singleLine="true"
+                            android:gravity="center_vertical|start"
+                            android:maxLines="1"
                             android:text="—"
                             android:textColor="#FFFFFFFF"
                             android:textSize="24sp"
@@ -517,7 +521,7 @@
                     android:clipToPadding="false"
                     android:visibility="gone" />
             </LinearLayout>
-            </HorizontalScrollView>
+            </com.gathin.tvhome.GlideScrollView>
 
             <LinearLayout
                 android:id="@+id/topButtons"
