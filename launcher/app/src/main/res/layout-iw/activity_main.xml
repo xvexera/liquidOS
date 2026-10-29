@@ -587,12 +587,13 @@
 
         <!-- The wrapper clips at the grid's edge; the grid itself must not clip so scaled tiles can overflow their cells. -->
         <FrameLayout
+            android:id="@+id/gridFrame"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_marginTop="10dp">
 
-            <androidx.recyclerview.widget.RecyclerView
+            <com.gathin.tvhome.TopFadeGrid
                 android:id="@+id/grid"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"

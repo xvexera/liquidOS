@@ -504,6 +504,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
         int rowsBelowDock = cfg.rowsBelowDock;
+        // Scrolled rows go on up past the grid's top to just under the widgets (or the clock) and fade out there,
+        // instead of being cut at the grid's edge (TopFadeGrid). Its frame and the page let it draw there.
+        View gridFrame = findViewById(R.id.gridFrame);
+        View widgetsScroll = findViewById(R.id.widgetsScroll);
+        if (gridFrame != null && widgetsScroll != null && grid instanceof TopFadeGrid) {
+            ((ViewGroup) gridFrame).setClipChildren(false);
+            ((ViewGroup) gridFrame.getParent()).setClipChildren(false);
+            View header = (View) widgetsScroll.getParent();
+            header.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> placeGridFade(widgetsScroll));
+            grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> placeGridFade(widgetsScroll));
+        }
         grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
             int h = b - t;
             // Item height follows the tile size, which follows the columns and the rows that must fit (AppAdapter.tileWidthPx).
@@ -2047,6 +2058,33 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             pendingFocusScroll = null;
             grid.stopScroll();
         }
+    }
+
+    private final int[] fadeAt = new int[2];
+
+    /**
+     * Where scrolled rows stop: a little under the lowest thing of the header that shows (the widgets' cards, else the
+     * clock and stats), in the grid's coordinates. Runs on every layout of either; cheap when nothing moved.
+     */
+    private void placeGridFade(View widgetsScroll) {
+        View lowest;
+        int bottom;
+        if (widgetsScroll.getVisibility() == View.VISIBLE) {
+            // The cards, not the room under them for a Continue watching X (shown only while a card has focus).
+            lowest = widgetsScroll;
+            bottom = widgetsScroll.getPaddingTop() + (int) (84 * density);
+        } else {
+            View stats = findViewById(R.id.stats);
+            lowest = stats != null && stats.getVisibility() == View.VISIBLE ? stats : findViewById(R.id.leftBlock);
+            if (lowest == null) return;
+            bottom = lowest.getHeight();
+        }
+        lowest.getLocationInWindow(fadeAt);
+        int stopAt = fadeAt[1] + bottom + (int) (14 * density);
+        grid.getLocationInWindow(fadeAt);
+        // Never below the grid's own top: then the rows are cut there as before.
+        int top = Math.min(0, stopAt - fadeAt[1]);
+        ((TopFadeGrid) grid).setFadeTop(top, (int) (72 * density));
     }
 
     private void focusTile(int position) {
