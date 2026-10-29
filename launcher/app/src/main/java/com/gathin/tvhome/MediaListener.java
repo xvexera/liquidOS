@@ -38,7 +38,7 @@ public class MediaListener extends NotificationListenerService {
             for (MediaController c : followed) {
                 PlaybackState s = c.getPlaybackState();
                 if (s != null && s.getState() == PlaybackState.STATE_PLAYING) {
-                    WatchHistory.record(MediaListener.this, c);
+                    lookUp(WatchHistory.record(MediaListener.this, c));
                     playing = true;
                 }
             }
@@ -65,7 +65,7 @@ public class MediaListener extends NotificationListenerService {
                 case PlaybackState.STATE_STOPPED:
                 case PlaybackState.STATE_SKIPPING_TO_NEXT:
                 case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-                    WatchHistory.record(MediaListener.this, controller);
+                    lookUp(WatchHistory.record(MediaListener.this, controller));
                     break;
                 default:
                     break;
@@ -74,8 +74,13 @@ public class MediaListener extends NotificationListenerService {
 
         @Override
         public void onMetadataChanged(MediaMetadata metadata) {
-            WatchHistory.record(MediaListener.this, controller);
+            lookUp(WatchHistory.record(MediaListener.this, controller));
         }
+    }
+
+    /** A YouTube video without its id: looked up once, on the worker thread (it is network). */
+    private void lookUp(WatchHistory.Entry e) {
+        if (e != null) WatchHistory.findYouTubeId(this, e);
     }
 
     private final List<Watcher> watchers = new ArrayList<>();

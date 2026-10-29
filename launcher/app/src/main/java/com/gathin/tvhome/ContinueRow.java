@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
@@ -27,14 +28,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Continue watching row between the widgets and the dock: the newest videos of WatchHistory as glass cards,
- * each with its picture, title and how far it got. OK opens the video again (at the same point where the app allows
- * it), a long OK takes it off the row. Built in start() from onResume, so a video paused a moment ago is there.
+ * The Continue watching cards, in the widgets row (HomeWidgets places and orders them): the newest videos of
+ * WatchHistory, each with its picture, title, how far it got and an X that takes it off. OK on a card opens the video
+ * again, at the same point where the app allows it. Rebuilt in start() from onResume, so a video paused a moment ago
+ * is there.
  */
 final class ContinueRow {
-    private static final int MAX_CARDS = 3;
+    /** The widgets row: moves focus along it and out of it. */
+    interface Host {
+        /** Left (-1) or Right (+1) from {@code from} to the next stop of the whole row. */
+        void step(View from, int direction);
+
+        void up();
+
+        void down();
+    }
+
+    private static final int MAX_CARDS = 6;
     /** Apps that open https://www.youtube.com/watch links themselves, with the start time. */
-    private static final String[] YOUTUBE = {"com.google.android.youtube.tv", "com.google.android.youtube.tvkids",
+    private static final String[] YOUTUBE = {WatchHistory.YOUTUBE_TV, "com.google.android.youtube.tvkids",
             "com.google.android.youtube.tvunplugged", "org.smarttube.stable", "org.smarttube.beta",
             "com.liskovsoft.smarttubetv", "com.liskovsoft.smarttubetv.beta", "com.teamsmart.videomanager.tv"};
 
@@ -43,62 +55,59 @@ final class ContinueRow {
     private final float density;
     private final boolean liquidGlass;
     private final boolean advanced;
-    private final Runnable focusUp;
-    private final Runnable focusDown;
+    private final Host host;
     private final List<View> cards = new ArrayList<>();
-    private boolean okDown;
-    private boolean okHandled;
+    /** Every focusable of the cards in order: each card, then its X. */
+    private final List<View> stops = new ArrayList<>();
 
-    ContinueRow(Activity activity, float density, boolean liquidGlass, boolean advanced, Runnable focusUp,
-                Runnable focusDown) {
+    ContinueRow(Activity activity, float density, boolean liquidGlass, boolean advanced, Host host) {
         this.activity = activity;
         this.row = activity.findViewById(R.id.continueRow);
         this.density = density;
         this.liquidGlass = liquidGlass;
         this.advanced = advanced;
-        this.focusUp = focusUp;
-        this.focusDown = focusDown;
+        this.host = host;
+    }
+
+    View view() {
+        return row;
     }
 
     boolean shown() {
-        return row != null && row.getVisibility() == View.VISIBLE && !cards.isEmpty();
+        return row != null && !cards.isEmpty();
     }
 
-    void focus() {
-        if (shown()) cards.get(0).requestFocus();
+    List<View> stops() {
+        return stops;
     }
 
-    /** Repaints the glass cards, after the blurred backdrop behind them changed. */
+    /** Repaints the glass cards, after the blurred backdrop behind them (or their place on screen) changed. */
     void invalidate() {
         for (View c : cards) c.invalidate();
     }
 
     void start() {
         if (row == null) return;
-        boolean had = row.findFocus() != null;
         row.removeAllViews();
         cards.clear();
+        stops.clear();
         if (Extras.continueWatching(activity)) {
             for (WatchHistory.Entry e : WatchHistory.load(activity)) {
                 if (cards.size() == MAX_CARDS) break;
-                if (!installed(e.pkg)) continue;
-                View card = card(e);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(286), dp(84));
+                if (!installed(e.pkg) || !WatchHistory.appOn(activity, e.pkg)) continue;
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(300), dp(84));
                 if (!cards.isEmpty()) lp.setMarginStart(dp(14));
-                row.addView(card, lp);
-                cards.add(card);
+                row.addView(card(e), lp);
             }
         }
         row.setVisibility(cards.isEmpty() ? View.GONE : View.VISIBLE);
-        if (had && !cards.isEmpty()) cards.get(0).requestFocus();
-        else if (had) focusDown.run();
     }
 
     private View card(WatchHistory.Entry e) {
         LinearLayout card = new LinearLayout(activity);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPaddingRelative(dp(12), 0, dp(16), 0);
+        card.setPaddingRelative(dp(12), 0, dp(14), 0);
         card.setFocusable(true);
         card.setClickable(true);
         float radius = 22 * density;
@@ -136,16 +145,26 @@ final class ContinueRow {
         tl.setMarginStart(dp(12));
         card.addView(texts, tl);
 
-        TextView kicker = text(activity.getString(R.string.continue_kicker, label(e.pkg)), 10, R.font.outfit_medium,
-                0x99FFFFFF);
-        kicker.setLetterSpacing(0.16f);
+        TextView kicker = text(activity.getString(R.string.continue_kicker, WatchHistory.label(activity, e.pkg)), 10,
+                R.font.outfit_medium, 0x99FFFFFF);
+        kicker.setLetterSpacing(0.1f);
         kicker.setAllCaps(true);
         texts.addView(kicker);
         TextView title = text(e.title, 15, R.font.outfit_medium, 0xFFFFFFFF);
         title.setPadding(0, dp(2), 0, 0);
         texts.addView(title);
 
-        // How far it got: a thin glass track with a white fill, and the minutes left.
+        // The time left, a short glass track with a white fill, and the X that removes the card.
+        LinearLayout bottom = new LinearLayout(activity);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(24));
+        bl.topMargin = dp(4);
+        texts.addView(bottom, bl);
+        long leftMin = Math.max(1, (e.durationMs - e.positionMs + 59_999) / 60_000);
+        TextView left = text(activity.getString(R.string.continue_left, (int) leftMin), 11, R.font.outfit_regular,
+                0xB3FFFFFF);
+        bottom.addView(left);
         LinearLayout track = new LinearLayout(activity);
         track.setBackground(flat(2 * density, 0x40FFFFFF));
         View fill = new View(activity);
@@ -153,70 +172,83 @@ final class ContinueRow {
         track.addView(fill, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, e.percent())));
         track.addView(new View(activity), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT,
                 Math.max(1, 100 - e.percent())));
-        LinearLayout.LayoutParams trl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3));
-        trl.topMargin = dp(7);
-        texts.addView(track, trl);
-        long leftMin = Math.max(1, (e.durationMs - e.positionMs + 59_999) / 60_000);
-        TextView left = text(activity.getString(R.string.continue_left, (int) leftMin), 11, R.font.outfit_regular,
-                0xB3FFFFFF);
-        left.setPadding(0, dp(4), 0, 0);
-        texts.addView(left);
+        LinearLayout.LayoutParams trl = new LinearLayout.LayoutParams(0, dp(3), 1f);
+        trl.setMarginStart(dp(8));
+        trl.setMarginEnd(dp(8));
+        bottom.addView(track, trl);
+        View remove = removeButton();
+        bottom.addView(remove, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
         card.setContentDescription(e.title);
         card.setOnFocusChangeListener((v, focused) -> {
             if (!advanced) return;   // the background's own cross-fade is the whole animation
-            v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(180)
+            v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(140)
                     .setUpdateListener(a -> v.invalidate()).start();
         });
-        card.setOnKeyListener((v, keyCode, event) -> onKey(v, e, keyCode, event));
+        card.setOnKeyListener((v, keyCode, event) -> onKey(v, keyCode, event, () -> open(e)));
+        remove.setOnKeyListener((v, keyCode, event) -> onKey(v, keyCode, event, () -> remove(e)));
+        cards.add(card);
+        stops.add(card);
+        stops.add(remove);
         return card;
     }
 
-    /** OK opens, a long OK removes; Left and Right move along the row, Up and Down leave it. */
-    private boolean onKey(View card, WatchHistory.Entry e, int keyCode, KeyEvent event) {
+    /** A small glass circle with an X; white with a dark X while focused, like the other buttons. */
+    private View removeButton() {
+        ImageView x = new ImageView(activity);
+        x.setImageResource(R.drawable.ic_close);
+        x.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        x.setPadding(dp(6), dp(6), dp(6), dp(6));
+        StateListDrawable bg = new StateListDrawable();
+        bg.addState(new int[]{android.R.attr.state_focused}, oval(0xFFFFFFFF));
+        bg.addState(new int[0], oval(0x33FFFFFF));
+        bg.setEnterFadeDuration(90);
+        bg.setExitFadeDuration(90);
+        x.setBackground(bg);
+        x.setImageTintList(new ColorStateList(new int[][]{{android.R.attr.state_focused}, {}},
+                new int[]{0xFF1C1C1E, 0xDDFFFFFF}));
+        x.setFocusable(true);
+        x.setClickable(true);
+        x.setContentDescription(activity.getString(R.string.continue_remove));
+        return x;
+    }
+
+    /** OK runs {@code action}; Left and Right move along the whole widgets row, Up and Down leave it. */
+    private boolean onKey(View v, int keyCode, KeyEvent event, Runnable action) {
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
-        int at = cards.indexOf(card);
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
-                if (down) {
-                    if (event.getRepeatCount() == 0) {
-                        okDown = true;
-                        okHandled = false;
-                    } else if (okDown && !okHandled && event.getRepeatCount() >= 2) {
-                        okHandled = true;
-                        WatchHistory.remove(activity, e);
-                        start();
-                        if (shown()) cards.get(Math.min(at, cards.size() - 1)).requestFocus();
-                        else focusDown.run();
-                    }
-                } else {
-                    if (okDown && !okHandled) open(e);
-                    okDown = false;
-                }
+                if (!down && event.getRepeatCount() == 0) action.run();
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (down) {
-                    boolean ltr = row.getLayoutDirection() == View.LAYOUT_DIRECTION_LTR;
-                    int next = at + ((keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) == ltr ? 1 : -1);
-                    if (next >= 0 && next < cards.size()) cards.get(next).requestFocus();
-                }
+                if (down) host.step(v, keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (down) focusUp.run();
+                if (down) host.up();
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
-                if (down) focusDown.run();
+                if (down) host.down();
                 return true;
             default:
                 return false;
         }
     }
 
+    /** The X: off the history and the row; focus goes to the next card (or the one before, or the dock). */
+    private void remove(WatchHistory.Entry e) {
+        int at = -1;
+        for (int i = 0; i < cards.size(); i++) if (cards.get(i).hasFocus()) at = i;
+        WatchHistory.remove(activity, e);
+        start();
+        if (!cards.isEmpty()) cards.get(Math.max(0, Math.min(at, cards.size() - 1))).requestFocus();
+        else host.down();
+    }
+
     /**
      * Back to the video: through its session when the app still has it open (the exact player), else a YouTube link
-     * with the start time for the apps that take one, else the app itself.
+     * with the start time (looking the video id up first if YouTube did not give it), else the app itself.
      */
     private void open(WatchHistory.Entry e) {
         try {
@@ -235,19 +267,39 @@ final class ContinueRow {
         } catch (SecurityException | PendingIntent.CanceledException ignored) {
             // no grant, or the session went away: the next ways still work
         }
-        if (isYouTube(e.pkg) && e.mediaId.matches("[A-Za-z0-9_-]{11}")) {
-            Intent watch = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + e.mediaId
-                    + "&t=" + (e.positionMs / 1000) + "s")).setPackage(e.pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            try {
-                activity.startActivity(watch);
+        if (isYouTube(e.pkg)) {
+            if (WatchHistory.hasVideoId(e)) {
+                if (watch(e)) return;
+            } else if (e.pkg.equals(WatchHistory.YOUTUBE_TV)) {
+                // Not looked up yet (YouTube was offline when it played): look it up now, then open it.
+                Thread t = new Thread(() -> {
+                    String id = WatchHistory.findYouTubeId(activity, e);
+                    activity.runOnUiThread(() -> {
+                        if (id == null || !watch(e)) launch(e.pkg);
+                    });
+                }, "continue-youtube");
+                t.start();
                 return;
-            } catch (RuntimeException notTaken) {
-                // this build of the app does not open links: open it plainly
             }
         }
+        launch(e.pkg);
+    }
+
+    private boolean watch(WatchHistory.Entry e) {
+        Intent watch = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + e.mediaId
+                + "&t=" + (e.positionMs / 1000) + "s")).setPackage(e.pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            activity.startActivity(watch);
+            return true;
+        } catch (RuntimeException notTaken) {
+            return false;   // this build of the app does not open links: open it plainly
+        }
+    }
+
+    private void launch(String pkg) {
         PackageManager pm = activity.getPackageManager();
-        Intent launch = pm.getLeanbackLaunchIntentForPackage(e.pkg);
-        if (launch == null) launch = pm.getLaunchIntentForPackage(e.pkg);
+        Intent launch = pm.getLeanbackLaunchIntentForPackage(pkg);
+        if (launch == null) launch = pm.getLaunchIntentForPackage(pkg);
         if (launch == null) return;
         try {
             activity.startActivity(launch);
@@ -267,15 +319,6 @@ final class ContinueRow {
             return true;
         } catch (PackageManager.NameNotFoundException e) {
             return false;
-        }
-    }
-
-    private String label(String pkg) {
-        PackageManager pm = activity.getPackageManager();
-        try {
-            return pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
-        } catch (PackageManager.NameNotFoundException e) {
-            return pkg;
         }
     }
 
@@ -306,6 +349,13 @@ final class ContinueRow {
         GradientDrawable d = new GradientDrawable();
         d.setColor(color);
         d.setCornerRadius(radius);
+        return d;
+    }
+
+    private static GradientDrawable oval(int color) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(color);
         return d;
     }
 

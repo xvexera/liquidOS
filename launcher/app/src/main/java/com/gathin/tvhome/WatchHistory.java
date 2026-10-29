@@ -14,14 +14,22 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Continue watching: what the TV's video apps played, kept by the launcher itself. Google TV keeps its own list in
@@ -68,7 +76,56 @@ final class WatchHistory {
             "com.google.android.apps.youtube.music", "com.amazon.mp3", "com.aspiro.tidal", "deezer.android.tv",
             "com.apple.android.music", "com.soundcloud.android", "com.pandora.android.atv", "tunein.player"};
 
+    /** Not video players: kept out of the app picker (they can still be added if they ever play something). */
+    private static final String[] NOT_VIDEO = {"com.android.vending", "com.android.tv.settings",
+            "com.google.android.tv.settings", "com.esaba.downloader", "org.localsend.localsend_app",
+            "com.neilturner.aerialviews", "com.google.android.apps.tv.launcherx", "com.google.android.katniss"};
+    /**
+     * YouTube's TV app opens https://www.youtube.com/watch links, with &t= for the start, but its session gives only
+     * the title and channel: the video id is looked up once with a YouTube search for them.
+     */
+    static final String YOUTUBE_TV = "com.google.android.youtube.tv";
+    private static final Pattern VIDEO_ID = Pattern.compile("[A-Za-z0-9_-]{11}");
+    private static final Pattern SEARCH_RESULT = Pattern.compile(
+            "\"videoRenderer\":\\{\"videoId\":\"([A-Za-z0-9_-]{11})\".{0,4000}?\"title\":\\{\"runs\":\\[\\{\"text\":\"((?:[^\"\\\\]|\\\\.)*)\"");
+
     private WatchHistory() {
+    }
+
+    /** Apps switched off in the Continue watching app picker. */
+    static boolean appOn(Context ctx, String pkg) {
+        return !Extras.continueAppsOff(ctx).contains(pkg);
+    }
+
+    /**
+     * The apps the picker lists: what the TV can launch, without music apps and the obvious non-players, plus any
+     * app already in the history. Sorted by name.
+     */
+    static List<String> candidates(Context ctx) {
+        PackageManager pm = ctx.getPackageManager();
+        Set<String> pkgs = new java.util.TreeSet<>();
+        android.content.Intent main = new android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_LEANBACK_LAUNCHER);
+        for (android.content.pm.ResolveInfo r : pm.queryIntentActivities(main, 0)) pkgs.add(r.activityInfo.packageName);
+        for (Entry e : load(ctx)) pkgs.add(e.pkg);
+        List<String> out = new ArrayList<>();
+        for (String p : pkgs) {
+            if (p.equals(ctx.getPackageName()) || isMusicApp(ctx, p)) continue;
+            boolean skip = false;
+            for (String n : NOT_VIDEO) skip |= n.equals(p);
+            if (!skip) out.add(p);
+        }
+        out.sort((a, b) -> label(ctx, a).compareToIgnoreCase(label(ctx, b)));
+        return out;
+    }
+
+    static String label(Context ctx, String pkg) {
+        PackageManager pm = ctx.getPackageManager();
+        try {
+            return pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
+        } catch (PackageManager.NameNotFoundException e) {
+            return pkg;
+        }
     }
 
     private static File dir(Context ctx) {
@@ -175,16 +232,19 @@ final class WatchHistory {
         return Math.max(0, pos);
     }
 
-    /** Writes down where {@code c}'s video is, or drops it once finished. Called off the main thread. */
-    static synchronized void record(Context ctx, MediaController c) {
-        if (!Extras.continueWatching(ctx)) return;
+    /**
+     * Writes down where {@code c}'s video is, or drops it once finished. Called off the main thread. Returns the
+     * entry when it still needs its YouTube video id (see {@link #findYouTubeId}), else null.
+     */
+    static synchronized Entry record(Context ctx, MediaController c) {
+        if (!Extras.continueWatching(ctx)) return null;
         String pkg = c.getPackageName();
-        if (pkg == null || pkg.equals(ctx.getPackageName()) || isMusicApp(ctx, pkg)) return;
+        if (pkg == null || pkg.equals(ctx.getPackageName()) || isMusicApp(ctx, pkg) || !appOn(ctx, pkg)) return null;
         MediaMetadata m = c.getMetadata();
-        if (m == null) return;
+        if (m == null) return null;
         String title = text(m, MediaMetadata.METADATA_KEY_TITLE, MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
         long duration = m.getLong(MediaMetadata.METADATA_KEY_DURATION);
-        if (title.isEmpty() || duration < MIN_DURATION_MS) return;
+        if (title.isEmpty() || duration < MIN_DURATION_MS) return null;
         long position = Math.min(position(c.getPlaybackState()), duration);
 
         List<Entry> list = load(ctx);
@@ -197,7 +257,7 @@ final class WatchHistory {
                 list.remove(e);
                 save(ctx, list);
             }
-            return;
+            return null;
         }
         if (e == null) {
             e = new Entry();
@@ -208,7 +268,8 @@ final class WatchHistory {
         }
         e.subtitle = text(m, MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, MediaMetadata.METADATA_KEY_ARTIST);
         String id = m.getString(MediaMetadata.METADATA_KEY_MEDIA_ID);
-        e.mediaId = id != null ? id : "";
+        if (id != null && VIDEO_ID.matcher(id).matches()) e.mediaId = id;
+        else if (e.mediaId == null) e.mediaId = "";
         e.positionMs = position;
         e.durationMs = duration;
         e.updatedAt = System.currentTimeMillis();
@@ -222,6 +283,92 @@ final class WatchHistory {
         list.sort((x, y) -> Long.compare(y.updatedAt, x.updatedAt));
         while (list.size() > MAX) list.remove(list.size() - 1);
         save(ctx, list);
+        return pkg.equals(YOUTUBE_TV) && !hasVideoId(e) && list.contains(e) ? e : null;
+    }
+
+    static boolean hasVideoId(Entry e) {
+        return e.mediaId != null && VIDEO_ID.matcher(e.mediaId).matches();
+    }
+
+    /**
+     * The YouTube video id for {@code e}, from a YouTube search for its title and channel: the result whose title
+     * matches, else the first. Network, so off the main thread. Kept in the history (with YouTube's own 16:9
+     * thumbnail), so it runs once per video. Null when YouTube cannot be reached.
+     */
+    static String findYouTubeId(Context ctx, Entry e) {
+        String query = e.title + (e.subtitle == null || e.subtitle.isEmpty() ? "" : " " + e.subtitle);
+        String page;
+        try {
+            page = new String(get("https://www.youtube.com/results?search_query=" + URLEncoder.encode(query, "UTF-8")),
+                    StandardCharsets.UTF_8);
+        } catch (IOException offline) {
+            return null;
+        }
+        Matcher m = SEARCH_RESULT.matcher(page);
+        String first = null, id = null;
+        while (id == null && m.find()) {
+            if (first == null) first = m.group(1);
+            if (unescape(m.group(2)).equalsIgnoreCase(e.title)) id = m.group(1);
+        }
+        if (id == null) id = first;
+        if (id == null) return null;
+        Bitmap thumb = null;
+        try {
+            byte[] jpg = get("https://i.ytimg.com/vi/" + id + "/mqdefault.jpg");
+            thumb = BitmapFactory.decodeByteArray(jpg, 0, jpg.length);
+        } catch (IOException ignored) {
+            // the session's own picture stays
+        }
+        synchronized (WatchHistory.class) {
+            List<Entry> list = load(ctx);
+            for (Entry x : list) {
+                if (!x.key().equals(e.key())) continue;
+                x.mediaId = id;
+                if (thumb != null) {
+                    String name = String.format(Locale.ROOT, "%08x.jpg", x.key().hashCode());
+                    if (writeThumb(ctx, thumb, name)) x.art = name;
+                }
+                save(ctx, list);
+            }
+        }
+        e.mediaId = id;
+        return id;
+    }
+
+    /** A JSON string's escapes (\" \\ &) undone. */
+    private static String unescape(String json) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c != '\\' || i + 1 >= json.length()) {
+                b.append(c);
+                continue;
+            }
+            char n = json.charAt(++i);
+            if (n == 'u' && i + 4 < json.length()) {
+                b.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
+                i += 4;
+            } else {
+                b.append(n == 'n' ? '\n' : n);
+            }
+        }
+        return b.toString();
+    }
+
+    private static byte[] get(String address) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(address).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
+        c.setRequestProperty("User-Agent", "Mozilla/5.0");
+        c.setRequestProperty("Accept-Language", "en");
+        try (InputStream in = c.getInputStream()) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            return out.toByteArray();
+        } finally {
+            c.disconnect();
+        }
     }
 
     private static String text(MediaMetadata m, String... keys) {

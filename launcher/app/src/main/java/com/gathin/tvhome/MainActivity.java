@@ -116,7 +116,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private WallpaperPlayer wallpaperPlayer;
     /** BTC/USDT and now playing under the clock; see HomeWidgets. */
     private HomeWidgets widgets;
-    private ContinueRow continueRow;
     /** The light that crosses the focused tile (GlintView), kept on the glass highlight's place and size. */
     private GlintView glint;
     /** The dock band; told when the grid scrolls so its glass is moved, not redrawn, meanwhile. */
@@ -611,17 +610,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                // The widgets sit between the top bar and the dock: the player first (it is nearer the pills).
-                if (widgets != null && widgets.playerShown()) {
-                    widgets.focusPlayer();
-                    return true;
-                }
-                if (widgets != null && widgets.marketShown()) {
-                    widgets.focusMarket();
+                // The widgets row sits between the top bar and the dock.
+                if (widgets != null && widgets.rowShown()) {
+                    widgets.focusRow();
                     return true;
                 }
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
-                focusBelowWidgets();
+                focusTile(lastFocused % COLUMNS);
                 return true;
             }
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs
@@ -691,10 +686,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // No wallpaper: give the glass the plain background to show until the first app glow arrives.
         scheduleGlowBackdrop();
         widgets = new HomeWidgets(this, density, liquidGlass, advancedEffects,
-                this::focusBelowWidgets, () -> btnWifi.requestFocus());
+                () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
         widgets.setOnMarketMenu(this::showMarketMenu);
-        continueRow = new ContinueRow(this, density, liquidGlass, advancedEffects, this::focusAboveContinue,
-                () -> focusTile(lastFocused % COLUMNS));
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
@@ -784,7 +777,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updateInputsButton();
         if (showStats) startStats();
         widgets.start();
-        continueRow.start();
         if (calendarEvents != null) calendarEvents.start();
         refreshOnlineWallpaper(false);
         if (pendingSettingsAction != null) {
@@ -1975,18 +1967,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (position < COLUMNS) {
-                // dock row: Continue watching when it shows, else a widget (the player, else the market card),
-                // else the top bar
-                if (continueRow != null && continueRow.shown()) {
-                    continueRow.focus();
-                    return true;
-                }
-                if (widgets != null && widgets.playerShown()) {
-                    widgets.focusPlayer();
-                    return true;
-                }
-                if (widgets != null && widgets.marketShown()) {
-                    widgets.focusMarket();
+                // dock row: the widgets row when it shows (the card focused there last), else the top bar
+                if (widgets != null && widgets.rowShown()) {
+                    widgets.focusRow();
                     return true;
                 }
                 return false;
@@ -2063,19 +2046,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             pendingFocusScroll = null;
             grid.stopScroll();
         }
-    }
-
-    /** Down from the widgets (or the top bar with none): Continue watching when it shows, else the dock. */
-    private void focusBelowWidgets() {
-        if (continueRow != null && continueRow.shown()) continueRow.focus();
-        else focusTile(lastFocused % COLUMNS);
-    }
-
-    /** Up from Continue watching: the player, else the market card, else the top bar. */
-    private void focusAboveContinue() {
-        if (widgets != null && widgets.playerShown()) widgets.focusPlayer();
-        else if (widgets != null && widgets.marketShown()) widgets.focusMarket();
-        else btnWifi.requestFocus();
     }
 
     private void focusTile(int position) {
@@ -2785,7 +2755,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (uiGlint == null) return;
         if (!litView(to) || !to.isShown() || !to.isAttachedToWindow()) {
             uiGlint.animate().cancel();
-            uiGlint.animate().alpha(0f).setDuration(animations ? 140 : 0).start();
+            uiGlint.animate().alpha(0f).setDuration(animations ? 90 : 0).start();
             return;
         }
         Rect r = new Rect(0, 0, to.getWidth(), to.getHeight());
@@ -2814,7 +2784,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         uiGlint.sweep(0f, 0f, false);
         uiGlint.animate().cancel();
         uiGlint.setAlpha(0f);
-        uiGlint.animate().alpha(1f).setDuration(animations ? 220 : 0).start();
+        uiGlint.animate().alpha(1f).setDuration(animations ? 120 : 0).start();
     }
 
     /** Repaints every Liquid Glass surface after the blurred wallpaper behind them changed. */
@@ -2825,7 +2795,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         grid.invalidateItemDecorations();
         if (widgets != null) widgets.invalidate();
-        if (continueRow != null) continueRow.invalidate();
     }
 
     private void showSettingsMenu() {
@@ -2895,7 +2864,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         row.findViewById(R.id.icon).setVisibility(View.GONE);
         row.findViewById(R.id.dot).setVisibility(View.GONE);
         ((TextView) row.findViewById(R.id.title)).setText(title);
-        ((TextView) row.findViewById(R.id.status)).setText(status);
+        TextView mark = row.findViewById(R.id.status);
+        mark.setText(status);
+        // The tick of the current choice: blue and larger, so it reads on the white focused row as on the glass.
+        if ("✓".equals(status)) {
+            mark.setTextColor(0xFF0A84FF);
+            mark.setTextSize(20);
+            mark.setTypeface(getResources().getFont(R.font.outfit_medium));
+        }
         return row;
     }
 
@@ -2925,8 +2901,73 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             });
             items.add(row);
         }
+        // The order of the cards in the widgets row: its own small menu.
+        boolean[] reorder = {false};
+        View order = menuRow(getString(R.string.widget_order), "\u203A");
+        order.setOnClickListener(v -> {
+            reorder[0] = true;
+            if (openPopup != null) openPopup.dismiss();
+        });
+        items.add(order);
         showListMenu(R.string.section_widgets, items, null, () -> {
+            if (reorder[0]) {
+                // The toggles are saved already; the row is rebuilt when the order menu closes.
+                if (changed[0]) Extras.bumpRevision(this);
+                handler.post(() -> showWidgetOrderMenu(changed[0]));
+                return;
+            }
             if (!changed[0]) return;
+            Extras.bumpRevision(this);
+            recreate();
+        });
+    }
+
+    /**
+     * The widgets row's order: OK picks a widget up (it turns blue), Up and Down carry it, OK puts it down. Home is
+     * rebuilt in the new order when the menu closes.
+     */
+    private void showWidgetOrderMenu(boolean rebuild) {
+        List<String> order = Extras.widgetOrder(this);
+        List<View> items = new ArrayList<>();
+        String[] carried = {null};
+        boolean[] moved = {false};
+        for (String w : order) {
+            int title = w.equals("market") ? R.string.widget_btc : w.equals("player") ? R.string.widget_music
+                    : R.string.widget_continue;
+            View row = menuRow(getString(title), "\u2195");
+            TextView status = row.findViewById(R.id.status);
+            row.setOnClickListener(v -> {
+                carried[0] = carried[0] == null ? w : null;
+                status.setText(carried[0] != null ? "\u25B2\u25BC" : "\u2195");
+                TextView name = row.findViewById(R.id.title);
+                if (carried[0] != null) name.setTextColor(0xFF0A84FF);
+                else name.setTextColor(getColorStateList(R.color.pill_text));
+            });
+            row.setOnKeyListener((v, keyCode, event) -> {
+                if (carried[0] == null || !w.equals(carried[0])) return false;
+                if (keyCode != KeyEvent.KEYCODE_DPAD_UP && keyCode != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+                if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+                ViewGroup parent = (ViewGroup) v.getParent();
+                int at = parent.indexOfChild(v);
+                int to = at + (keyCode == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : -1);
+                // Only among the widgets: the heading or anything else in the list stays put.
+                int first = Integer.MAX_VALUE;
+                for (View item : items) first = Math.min(first, parent.indexOfChild(item));
+                if (to < first || to >= first + items.size()) return true;
+                parent.removeView(v);
+                parent.addView(v, to);
+                v.requestFocus();
+                int i = order.indexOf(w);
+                order.remove(i);
+                order.add(i + (to - at), w);
+                moved[0] = true;
+                return true;
+            });
+            items.add(row);
+        }
+        showListMenu(R.string.widget_order, items, null, () -> {
+            if (moved[0]) Extras.setWidgetOrder(this, order);
+            if (!moved[0] && !rebuild) return;
             Extras.bumpRevision(this);
             recreate();
         });

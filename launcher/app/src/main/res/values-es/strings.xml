@@ -211,4 +211,7 @@
     <string name="widget_continue">Seguir viendo</string>
     <string name="continue_kicker">Seguir viendo · %1$s</string>
     <string name="continue_left">Quedan %1$d min</string>
+    <string name="continue_remove">Quitar de Seguir viendo</string>
+    <string name="widget_order">Editar orden</string>
+    <string name="continue_apps_hint">Elige las apps cuyos videos aparecen en Seguir viendo. Las de música nunca aparecen.</string>
 </resources>

@@ -297,13 +297,31 @@
 
             <!-- Home widgets under the clock: BTC/USDT and the now playing card, on Liquid Glass. Each is shown
                  only when switched on in Launcher settings; the row is gone when both are. -->
+            <!-- The widgets row slides sideways when its cards do not fit. Padded so a zoomed card is not clipped,
+                 pulled back by the same amount so the cards line up with the clock. -->
+            <HorizontalScrollView
+                android:id="@+id/widgetsScroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/stats"
+                android:layout_alignStart="@id/leftBlock"
+                android:layout_alignParentEnd="true"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="-10dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="40dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:clipToPadding="false"
+                android:clipChildren="false"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:visibility="gone">
+
             <LinearLayout
                 android:id="@+id/widgets"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/stats"
-                android:layout_alignStart="@id/leftBlock"
-                android:layout_marginTop="18dp"
                 android:orientation="horizontal"
                 android:clipChildren="false"
                 android:clipToPadding="false"
@@ -484,21 +502,18 @@
                         android:src="@drawable/ic_skip_next"
                         android:importantForAccessibility="no" />
                 </LinearLayout>
+                <!-- Continue watching: the videos the TV's apps played, as glass cards; see ContinueRow. -->
+                <LinearLayout
+                    android:id="@+id/continueRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:orientation="horizontal"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:visibility="gone" />
             </LinearLayout>
-
-            <!-- Continue watching: the videos the TV's apps played, as glass cards; see ContinueRow. Gone when it is
-                 switched off in Widgets or there is nothing to continue. -->
-            <LinearLayout
-                android:id="@+id/continueRow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_below="@id/widgets"
-                android:layout_alignStart="@id/leftBlock"
-                android:layout_marginTop="14dp"
-                android:orientation="horizontal"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:visibility="gone" />
+            </HorizontalScrollView>
 
             <LinearLayout
                 android:id="@+id/topButtons"

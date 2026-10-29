@@ -95,6 +95,16 @@ public final class LauncherSettingsActivity extends Activity {
         stepper(home, getString(R.string.clock_style), getString(R.string.clock_style_hint), styles,
                 Math.max(0, styleAt), i -> choices.edit().putString(Extras.CLOCK_STYLE, Extras.CLOCK_STYLES[i]).apply());
 
+        // Continue watching: which apps it follows; new apps start switched on.
+        LinearLayout watching = section(left, R.string.widget_continue);
+        TextView watchingHint = text(getString(R.string.continue_apps_hint), 13, R.font.outfit_regular, 0x99FFFFFF);
+        watchingHint.setPadding(dp(4), 0, dp(4), dp(8));
+        watching.addView(watchingHint);
+        for (String pkg : WatchHistory.candidates(this)) {
+            toggle(watching, WatchHistory.label(this, pkg), null, WatchHistory.appOn(this, pkg),
+                    on -> Extras.setContinueApp(this, pkg, on));
+        }
+
         // Wallpaper
         LinearLayout wallpaper = section(left, R.string.section_wallpaper);
         String[] dims = new String[DIM_STEPS.length];

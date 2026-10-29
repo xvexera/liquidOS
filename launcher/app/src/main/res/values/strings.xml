@@ -255,4 +255,7 @@
     <string name="widget_continue">Continue watching</string>
     <string name="continue_kicker">Continue watching · %1$s</string>
     <string name="continue_left">%1$d min left</string>
+    <string name="continue_remove">Remove from Continue watching</string>
+    <string name="widget_order">Edit order</string>
+    <string name="continue_apps_hint">Pick the apps whose videos appear in Continue watching. Music apps are always left out.</string>
 </resources>

@@ -198,8 +198,8 @@ final class LiquidGlass {
     static Drawable widgetCard(float radiusPx, float density) {
         StateListDrawable d = new StateListDrawable();
         // Rest and focus cross-fade instead of switching in one frame.
-        d.setEnterFadeDuration(220);
-        d.setExitFadeDuration(220);
+        d.setEnterFadeDuration(110);
+        d.setExitFadeDuration(110);
         for (boolean focused : new boolean[]{true, false}) {
             Surface s = new Surface(radiusPx, density, focused);
             s.veil = true;

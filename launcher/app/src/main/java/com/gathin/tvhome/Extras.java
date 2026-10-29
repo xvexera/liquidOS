@@ -13,6 +13,11 @@ final class Extras {
     static final String CALENDAR = "calendar_widget";
     /** The Continue watching row on Home, and the history behind it (WatchHistory). */
     static final String CONTINUE_WATCHING = "continue_watching";
+    /** Apps switched off in the Continue watching app picker (package names); new apps start switched on. */
+    static final String CONTINUE_APPS_OFF = "continue_apps_off";
+    /** Order of the cards in the widgets row: "market", "player", "continue", comma-separated. */
+    static final String WIDGET_ORDER = "widget_order";
+    static final String[] WIDGETS = {"market", "player", "continue"};
     /** Days ahead the calendar pill counts events for: 1 to 30. */
     static final String CALENDAR_DAYS = "calendar_days";
     static final int CALENDAR_MAX_DAYS = 30;
@@ -114,6 +119,31 @@ final class Extras {
 
     static boolean continueWatching(Context ctx) {
         return prefs(ctx).getBoolean(CONTINUE_WATCHING, true);
+    }
+
+    static java.util.Set<String> continueAppsOff(Context ctx) {
+        return prefs(ctx).getStringSet(CONTINUE_APPS_OFF, java.util.Collections.emptySet());
+    }
+
+    static void setContinueApp(Context ctx, String pkg, boolean on) {
+        java.util.Set<String> off = new java.util.HashSet<>(continueAppsOff(ctx));
+        if (on) off.remove(pkg);
+        else off.add(pkg);
+        prefs(ctx).edit().putStringSet(CONTINUE_APPS_OFF, off).apply();
+    }
+
+    /** The widgets row's order: the saved one, with any widget it lacks added at the end. */
+    static java.util.List<String> widgetOrder(Context ctx) {
+        java.util.List<String> order = new java.util.ArrayList<>();
+        for (String w : prefs(ctx).getString(WIDGET_ORDER, "").split(",")) {
+            if (java.util.Arrays.asList(WIDGETS).contains(w) && !order.contains(w)) order.add(w);
+        }
+        for (String w : WIDGETS) if (!order.contains(w)) order.add(w);
+        return order;
+    }
+
+    static void setWidgetOrder(Context ctx, java.util.List<String> order) {
+        prefs(ctx).edit().putString(WIDGET_ORDER, String.join(",", order)).apply();
     }
 
     static boolean liquidGlass(Context ctx) {

@@ -17,19 +17,27 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
- * The widgets row under the clock: the BTC/USDT card and the now playing card. Home calls start() from
- * onResume and stop() from onPause, so the price is fetched and the media sessions are followed only while
- * Home is on screen. Layouts without the row (the Hebrew one) get an inert instance.
+ * The widgets row under the clock: the market card, the now playing card and the Continue watching cards, in the
+ * order chosen in the Widgets menu, in one row that slides sideways when they do not fit. Home calls start() from
+ * onResume and stop() from onPause, so the price is fetched and the media sessions are followed only while Home is
+ * on screen.
  */
 final class HomeWidgets {
     private static final int UP_COLOR = 0xFF34C759;
     private static final int DOWN_COLOR = 0xFFFF453A;
 
     private final Activity activity;
-    private final View row;
+    private final android.widget.LinearLayout row;
+    /** The row's sideways scroller: shown when any card is. */
+    private final android.widget.HorizontalScrollView scroll;
+    private final ContinueRow continueRow;
+    /** The stop of the row focused last, where Up from the dock and Down from the top bar come back to. */
+    private View lastStop;
     private final View btcCard;
     private final View playerCard;
     private final float density;
@@ -67,6 +75,23 @@ final class HomeWidgets {
         this.focusDock = focusDock;
         this.focusTopBar = focusTopBar;
         row = activity.findViewById(R.id.widgets);
+        scroll = activity.findViewById(R.id.widgetsScroll);
+        continueRow = new ContinueRow(activity, density, liquidGlass, advanced, new ContinueRow.Host() {
+            @Override
+            public void step(View from, int direction) {
+                HomeWidgets.this.step(from, direction);
+            }
+
+            @Override
+            public void up() {
+                focusTopBar.run();
+            }
+
+            @Override
+            public void down() {
+                focusDock.run();
+            }
+        });
         btcCard = activity.findViewById(R.id.btcCard);
         playerCard = activity.findViewById(R.id.playerCard);
         this.density = density;
@@ -90,6 +115,8 @@ final class HomeWidgets {
             }
         }
         btcCard.setOnFocusChangeListener((v, focused) -> focusCard(v, focused));
+        // The glass samples the wallpaper behind each card at its place on screen: slid, it has to be redrawn.
+        scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> invalidate());
         btcCard.setOnKeyListener((v, keyCode, event) -> onMarketKey(keyCode, event));
         // A soft shadow under the widgets' text, so green and red figures stay legible over a bright wallpaper
         // without darkening the glass itself.
@@ -108,6 +135,7 @@ final class HomeWidgets {
         art.setClipToOutline(true);
         playerCard.setOnFocusChangeListener((v, focused) -> {
             focusCard(v, focused);
+            if (focused) lastStop = v;
             // Entering the card always starts on play/pause; leaving it shows no selection.
             if (focused) selected = TOGGLE;
             showSelection(focused);
@@ -124,8 +152,9 @@ final class HomeWidgets {
      * stretched); the brighter glass fades in instead.
      */
     private void focusCard(View v, boolean focused) {
+        if (focused) lastStop = v;
         if (!advanced) return;   // the background's own cross-fade is the whole animation
-        v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(180)
+        v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(140)
                 .setUpdateListener(a -> v.invalidate()).start();
     }
 
@@ -234,9 +263,8 @@ final class HomeWidgets {
                 if (!down && onMarketMenu != null) onMarketMenu.run();
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (down && playerShown()) playerCard.requestFocus();
-                return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
+                if (down) step(btcCard, keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (down) focusDock.run();
@@ -255,6 +283,8 @@ final class HomeWidgets {
         active = true;
         if (ticker != null) startMarket();
         if (nowPlaying != null) nowPlaying.start();
+        continueRow.start();
+        applyOrder();
         updateRow();
     }
 
@@ -278,11 +308,74 @@ final class HomeWidgets {
         if (row == null) return;
         btcCard.invalidate();
         playerCard.invalidate();
+        continueRow.invalidate();
+    }
+
+    boolean rowShown() {
+        return row != null && scroll.getVisibility() == View.VISIBLE && !stops().isEmpty();
+    }
+
+    /** Into the row from above or below: the card focused last, else the first. */
+    void focusRow() {
+        List<View> stops = stops();
+        if (stops.isEmpty()) return;
+        (lastStop != null && stops.contains(lastStop) ? lastStop : stops.get(0)).requestFocus();
+    }
+
+    /** What takes focus in the row, left to right: the shown cards, and each Continue watching card's X. */
+    private List<View> stops() {
+        List<View> stops = new ArrayList<>();
+        if (row == null) return stops;
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View child = row.getChildAt(i);
+            if (child.getVisibility() != View.VISIBLE) continue;
+            if (child == continueRow.view()) stops.addAll(continueRow.stops());
+            else stops.add(child);
+        }
+        return stops;
+    }
+
+    /** Left or Right along the row; the scroller brings the next card into view. At the ends nothing moves. */
+    private void step(View from, int direction) {
+        List<View> stops = stops();
+        int at = stops.indexOf(from) + direction;
+        if (at < 0 || at >= stops.size()) return;
+        View next = stops.get(at);
+        next.requestFocus();
+        lastStop = next;
+        from.playSoundEffect(direction > 0 ? android.view.SoundEffectConstants.NAVIGATION_RIGHT
+                : android.view.SoundEffectConstants.NAVIGATION_LEFT);
+    }
+
+    /** The cards in the order chosen in the Widgets menu. */
+    private void applyOrder() {
+        List<View> wanted = new ArrayList<>();
+        for (String w : Extras.widgetOrder(activity)) {
+            wanted.add(w.equals("market") ? btcCard : w.equals("player") ? playerCard : continueRow.view());
+        }
+        boolean same = true;
+        for (int i = 0; i < wanted.size(); i++) same &= row.getChildAt(i) == wanted.get(i);
+        if (same) return;
+        for (View v : wanted) row.removeView(v);
+        for (View v : wanted) row.addView(v);
     }
 
     private void updateRow() {
-        boolean any = btcCard.getVisibility() == View.VISIBLE || playerCard.getVisibility() == View.VISIBLE;
+        boolean any = false;
+        // The gap goes before every shown card but the first, whatever the order.
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View child = row.getChildAt(i);
+            if (child.getVisibility() != View.VISIBLE) continue;
+            android.widget.LinearLayout.LayoutParams lp = (android.widget.LinearLayout.LayoutParams) child.getLayoutParams();
+            int gap = any ? Math.round(14 * density) : 0;
+            if (lp.getMarginStart() != gap) {
+                lp.setMarginStart(gap);
+                child.setLayoutParams(lp);
+            }
+            any = true;
+        }
         row.setVisibility(any ? View.VISIBLE : View.GONE);
+        scroll.setVisibility(any ? View.VISIBLE : View.GONE);
     }
 
     // ---- Market ------------------------------------------------------------------------------------
@@ -414,8 +507,8 @@ final class HomeWidgets {
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 if (down) {
                     int next = selected + (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
-                    if (next < PREV && marketShown()) {
-                        btcCard.requestFocus();
+                    if (next < PREV || next > NEXT) {
+                        step(playerCard, next < PREV ? -1 : 1);
                         return true;
                     }
                     if (next >= PREV && next <= NEXT) {
