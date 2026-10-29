@@ -688,6 +688,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         widgets = new HomeWidgets(this, density, liquidGlass, advancedEffects,
                 () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
         widgets.setOnMarketMenu(this::showMarketMenu);
+        widgets.setOnRowScrolled(this::followGlint);
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
@@ -2747,12 +2748,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (v == null) return false;
         int id = v.getId();
         return id == R.id.btnInputs || id == R.id.btnWifi || id == R.id.btnCalendar || id == R.id.btnNight
-                || id == R.id.btnReorder || id == R.id.btnSettings;
+                || id == R.id.btnReorder || id == R.id.btnSettings || litCard(v)
+                || HomeWidgets.LIT_PILL.equals(v.getTag());
+    }
+
+    /** The widgets row's cards: the light takes their 22dp corners (and zooms with them under advanced effects). */
+    private static boolean litCard(View v) {
+        return v.getId() == R.id.btcCard || v.getId() == R.id.playerCard || HomeWidgets.LIT_CARD.equals(v.getTag());
     }
 
     /** Puts the glow on {@code to} at its size and corners, and fades it in. */
     private void lightUp(View from, View to) {
         if (uiGlint == null) return;
+        litNow = null;
         if (!litView(to) || !to.isShown() || !to.isAttachedToWindow()) {
             uiGlint.animate().cancel();
             uiGlint.animate().alpha(0f).setDuration(animations ? 90 : 0).start();
@@ -2772,7 +2780,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         uiGlint.setLayoutParams(lp);
         uiGlint.setTranslationX(r.left - pad);
         uiGlint.setTranslationY(r.top - pad);
-        boolean pill = to.getId() != R.id.btcCard && to.getId() != R.id.playerCard;
+        boolean pill = !litCard(to);
+        litNow = to;
         uiGlint.setRadius(pill ? r.height() / 2f : 22 * density);
         // A widget card zooms a little with advanced effects: the light zooms with it, from the same centre.
         float scale = !pill && advancedEffects && animations ? 1.04f : 1f;
@@ -2785,6 +2794,23 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         uiGlint.animate().cancel();
         uiGlint.setAlpha(0f);
         uiGlint.animate().alpha(1f).setDuration(animations ? 120 : 0).start();
+    }
+
+    /** The view the focus light is on, while it is on one. */
+    private View litNow;
+
+    /** The widgets row slid: the light moves with the focused card (only moved, nothing redrawn). */
+    private void followGlint() {
+        if (litNow == null || uiGlint == null || !litNow.isAttachedToWindow()) return;
+        Rect r = new Rect(0, 0, litNow.getWidth(), litNow.getHeight());
+        try {
+            root.offsetDescendantRectToMyCoords(litNow, r);
+        } catch (IllegalArgumentException gone) {
+            return;
+        }
+        int pad = (int) (6 * density);
+        uiGlint.setTranslationX(r.left - pad);
+        uiGlint.setTranslationY(r.top - pad);
     }
 
     /** Repaints every Liquid Glass surface after the blurred wallpaper behind them changed. */

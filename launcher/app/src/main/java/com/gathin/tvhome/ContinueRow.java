@@ -110,6 +110,7 @@ final class ContinueRow {
         card.setPaddingRelative(dp(12), 0, dp(14), 0);
         card.setFocusable(true);
         card.setClickable(true);
+        card.setTag(HomeWidgets.LIT_CARD);
         float radius = 22 * density;
         if (liquidGlass) {
             card.setBackground(LiquidGlass.widgetCard(radius, density));
@@ -176,7 +177,7 @@ final class ContinueRow {
         trl.setMarginStart(dp(10));
         bottom.addView(track, trl);
 
-        // The X sits under the card, over its lower edge, and shows only while the card or the X has focus.
+        // The X is its own glass button under the card, shown only while the card or the X has focus.
         View remove = removeButton();
         remove.setAlpha(0f);
         Runnable showRemove = () -> remove.animate().alpha(card.hasFocus() || remove.hasFocus() ? 1f : 0f)
@@ -200,26 +201,31 @@ final class ContinueRow {
         item.setClipChildren(false);
         item.setClipToPadding(false);
         item.addView(card, new LinearLayout.LayoutParams(dp(300), dp(84)));
-        LinearLayout.LayoutParams xl = new LinearLayout.LayoutParams(dp(30), dp(30));
-        xl.topMargin = -dp(12);
+        LinearLayout.LayoutParams xl = new LinearLayout.LayoutParams(dp(36), dp(36));
+        xl.topMargin = dp(10);
         item.addView(remove, xl);
         return item;
     }
 
-    /** A small glass circle with an X; white with a dark X while focused, like the other buttons. */
+    /** A round Liquid Glass button with an X, like the top bar's buttons; Home's focus light fades in over it. */
     private View removeButton() {
         ImageView x = new ImageView(activity);
         x.setImageResource(R.drawable.ic_close);
         x.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        x.setPadding(dp(8), dp(8), dp(8), dp(8));
-        StateListDrawable bg = new StateListDrawable();
-        bg.addState(new int[]{android.R.attr.state_focused}, oval(0xFFFFFFFF));
-        bg.addState(new int[0], oval(0xCC2C2C2E));
-        bg.setEnterFadeDuration(90);
-        bg.setExitFadeDuration(90);
-        x.setBackground(bg);
-        x.setImageTintList(new ColorStateList(new int[][]{{android.R.attr.state_focused}, {}},
-                new int[]{0xFF1C1C1E, 0xDDFFFFFF}));
+        x.setPadding(dp(10), dp(10), dp(10), dp(10));
+        x.setTag(HomeWidgets.LIT_PILL);
+        if (liquidGlass) {
+            x.setBackground(LiquidGlass.roundButton(18 * density, density));
+            if (!advanced) x.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            x.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        } else {
+            StateListDrawable bg = new StateListDrawable();
+            bg.addState(new int[]{android.R.attr.state_focused}, oval(0xFFFFFFFF));
+            bg.addState(new int[0], oval(0xCC2C2C2E));
+            x.setBackground(bg);
+            x.setImageTintList(new ColorStateList(new int[][]{{android.R.attr.state_focused}, {}},
+                    new int[]{0xFF1C1C1E, 0xDDFFFFFF}));
+        }
         x.setFocusable(true);
         x.setClickable(true);
         x.setContentDescription(activity.getString(R.string.continue_remove));

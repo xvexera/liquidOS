@@ -197,9 +197,8 @@ final class LiquidGlass {
      */
     static Drawable widgetCard(float radiusPx, float density) {
         StateListDrawable d = new StateListDrawable();
-        // Rest and focus cross-fade instead of switching in one frame.
-        d.setEnterFadeDuration(110);
-        d.setExitFadeDuration(110);
+        // Rest and focus switch in one frame: a cross-fade redraws the glass shader every frame of it (a third of
+        // the frame time on a TV box). Home's focus light fades in over the card instead, which costs nothing.
         for (boolean focused : new boolean[]{true, false}) {
             Surface s = new Surface(radiusPx, density, focused);
             s.veil = true;
@@ -207,6 +206,14 @@ final class LiquidGlass {
             s.veilColor = focused ? 0x330A0A0E : 0x470A0A0E;
             d.addState(focused ? new int[]{android.R.attr.state_focused} : new int[0], s);
         }
+        return d;
+    }
+
+    /** A round glass button (the X of a Continue watching card): the pills' glass, brighter while focused. */
+    static Drawable roundButton(float radiusPx, float density) {
+        StateListDrawable d = new StateListDrawable();
+        d.addState(new int[]{android.R.attr.state_focused}, new Surface(radiusPx, density, true));
+        d.addState(new int[0], new Surface(radiusPx, density, false));
         return d;
     }
 

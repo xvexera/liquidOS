@@ -28,6 +28,9 @@ import java.util.Locale;
  * on screen.
  */
 final class HomeWidgets {
+    /** Tags of the views Home's focus light goes over: a widget card (22dp corners) or a round glass button. */
+    static final String LIT_CARD = "lit_card";
+    static final String LIT_PILL = "lit_pill";
     private static final int UP_COLOR = 0xFF34C759;
     private static final int DOWN_COLOR = 0xFFFF453A;
 
@@ -38,6 +41,8 @@ final class HomeWidgets {
     private final ContinueRow continueRow;
     /** The stop of the row focused last, where Up from the dock and Down from the top bar come back to. */
     private View lastStop;
+    /** Told on every frame the row slides, so Home's focus light can ride along with the focused card. */
+    private Runnable rowScrolled;
     private final View btcCard;
     private final View playerCard;
     private final float density;
@@ -117,8 +122,12 @@ final class HomeWidgets {
             }
         }
         btcCard.setOnFocusChangeListener((v, focused) -> focusCard(v, focused));
-        // The glass samples the wallpaper behind each card at its place on screen: slid, it has to be redrawn.
-        scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> invalidate());
+        // The glass samples the wallpaper behind each card at its place on screen. While the row slides the cards
+        // carry their glass along (cached, nothing redrawn: smooth); it is redrawn once where they stop.
+        ((GlideScrollView) scroll).setOnSettled(this::invalidate);
+        scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            if (rowScrolled != null) rowScrolled.run();
+        });
         btcCard.setOnKeyListener((v, keyCode, event) -> onMarketKey(keyCode, event));
         // A soft shadow under the widgets' text, so green and red figures stay legible over a bright wallpaper
         // without darkening the glass itself.
@@ -166,6 +175,10 @@ final class HomeWidgets {
         d.setStroke(Math.round(density), 0x33FFFFFF);
         d.setCornerRadius(radius);
         return d;
+    }
+
+    void setOnRowScrolled(Runnable action) {
+        rowScrolled = action;
     }
 
     void setOnMarketMenu(Runnable action) {
