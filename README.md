@@ -4,8 +4,8 @@
 ([@wade9_](https://x.com/wade9_)) on top of [cleanyourtv](https://github.com/Gathin23/cleanyourtv) by Gathin.
 
 liquidOS turns a stock Google TV box (developed and tested on an onn. 4K Streaming Box, Google TV 14) into
-an Apple TV style home screen with frosted glass, widgets, night mode and a large wallpaper collection, and
-removes the factory ads and trackers. Everything happens over Wi-Fi from a Windows PC: no root, no cable,
+an Apple TV style home screen with frosted glass, **Continue watching**, widgets, night mode and a large
+wallpaper collection, and removes the factory ads and trackers. Everything happens over Wi-Fi from a Windows PC: no root, no cable,
 nothing uninstalled, and every change can be undone.
 
 > The screenshots below show the launcher in Spanish; it follows the TV's system language (English, Spanish
@@ -14,6 +14,21 @@ nothing uninstalled, and every change can be undone.
 <p align="center">
   <img src="docs/liquidos/home.jpg" alt="liquidOS home screen with a rotating wallpaper and the glass dock" width="800">
 </p>
+
+### New: Continue watching
+
+<p align="center">
+  <img src="docs/liquidos/continue-watching.jpg" alt="Continue watching cards on Liquid Glass above the dock, one focused with its X button under it" width="800">
+</p>
+
+The videos you left halfway, right on Home: each one a Liquid Glass card with its picture, title and the time
+left. OK takes you back into the video, on YouTube at the exact minute you stopped. It shares one sliding row
+with the widgets, in the order you choose. (Titles and pictures are blurred in these screenshots.)
+
+| | |
+|---|---|
+| ![The widgets row with Continue watching and the market card](docs/liquidos/widgets-row.jpg) | ![The Widgets menu with Continue watching and Edit order](docs/liquidos/widgets-menu.jpg) |
+| **One row** for the widgets and Continue watching, sliding sideways when they do not fit | **Widgets menu**: switch each one on or off, and **Edit order** |
 
 | | |
 |---|---|
@@ -27,6 +42,20 @@ nothing uninstalled, and every change can be undone.
 | **Liquid Glass icons**: each app's logo alone on frosted glass (some apps' icons may not look right yet) | |
 
 ## Features
+
+### Continue watching
+- **The videos you left halfway** in your apps, as glass cards with the picture, title, a progress bar and the
+  time left. Finished videos, clips under 4 minutes, live streams without a length and music apps are left out.
+- **Back to the exact minute**: OK reopens the video through the app's own player while it is still open. On
+  YouTube it opens the video at the minute you stopped even after the app was closed: YouTube's player does not
+  say which video it is, so liquidOS finds it once by a YouTube search for the title and channel (and takes
+  YouTube's own picture for the card). SmartTube gets the same link; other apps open on their home screen.
+- **An X under each card** takes it off the list: Down from a card reaches it, so Left and Right go straight
+  from card to card.
+- **Pick the apps** it follows in *Launcher settings > Continue watching*; new apps start switched on.
+- **On or off** in *Settings > Widgets*. Switching it off also deletes the list.
+- Google TV keeps its own list where only system apps can read it, so liquidOS keeps its own, from what plays
+  on the TV, and only on the TV.
 
 ### Home screen
 - **Liquid Glass** pills, dock and widgets: a blurred, refracting copy of the wallpaper behind every panel,
@@ -43,13 +72,13 @@ nothing uninstalled, and every change can be undone.
 - **Glass clock** styles, greeting and date.
 
 ### Widgets
-- **Market**: BTC, ETH, S&P 500 and more, with a 24 h sparkline.
+- **One sliding row**: the market card, now playing and Continue watching share a row that glides sideways
+  when they do not fit. Left and Right walk the whole row; Up and Down leave it.
+- **Edit order** in *Settings > Widgets*: pick a widget up with OK, move it with Up and Down, put it down with OK.
+- **Market**: BTC, ETH, S&P 500 and more, with a 24 h sparkline. The card keeps its size as it rotates
+  between assets.
 - **Now playing**: the music or video playing on the TV, with controls.
 - **Calendar**: upcoming events from the Google accounts signed in on the TV, with a reminder.
-- **Continue watching**: the videos you left halfway in your apps, as glass cards with the picture, title and
-  time left. OK goes back to the video (YouTube and SmartTube at the same minute), a long OK removes it. Google
-  TV keeps its own list where only system apps can read it, so liquidOS keeps its own from what plays; music
-  apps are left out. Switch it off in *Settings > Widgets*, which also deletes the list.
 
 ### Night mode
 - **Artificial dimming** up to 100 % and **warm light** over every app.
@@ -70,6 +99,11 @@ nothing uninstalled, and every change can be undone.
   from YouTube takes about 120 to 150 ms.
 - Memory is let go when an app is in front (wallpaper released, garbage collected a few seconds later), and
   rebuilding Home no longer leaks the previous copy.
+- **Glass that follows a slide for little cost**: while the widgets row slides, each card keeps its content and
+  most of its glass in a cached layer; only the wallpaper right behind it is drawn again each frame (about the
+  same frame time as the row with no glass at all).
+- **Rows fade instead of being cut**: scrolled app rows go on up to just under the widgets and fade out there.
+  Only that strip is drawn through a small offscreen layer, and only while the grid is scrolled.
 
 ## liquidOS Installer
 
@@ -116,6 +150,8 @@ and no server of mine that your TV or PC talks to. The code is open, so anyone c
   only when you use those features:
   - **Wikimedia Commons**, for the rotating wallpapers.
   - **Binance** and **Yahoo Finance**, for the prices in the market widget (only when the widget is on).
+  - **YouTube**, once per YouTube video in Continue watching: a search for its title and channel, to find the
+    video and open it at the right minute, and its picture. Nothing else is sent, and nothing about you.
   - **A link you paste yourself** when uploading a wallpaper from your phone.
 - **Upload from phone** works only on your home network: the TV serves the page itself, only while the QR code
   is on screen, with a one-time code. Nothing goes through the internet.
@@ -124,6 +160,10 @@ and no server of mine that your TV or PC talks to. The code is open, so anyone c
 - **The installer** runs on your PC and talks only to your TV on your network. It downloads Google's ADB tools
   from Google if they are missing. Backups are saved in a folder on your PC and are never uploaded.
 - **The debloater** turns off the TV's factory trackers and ads: it shares less with the TV maker, not more.
+
+## Changelog
+
+What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 
 ## Credits
 
