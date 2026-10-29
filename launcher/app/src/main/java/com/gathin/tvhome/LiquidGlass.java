@@ -31,6 +31,12 @@ import android.view.View;
  */
 final class LiquidGlass {
     private static Bitmap backdrop;
+    /**
+     * While the widgets row slides: the surfaces draw the plain blur only (one textured round rect, sampled where they
+     * are at that frame), so the glass keeps showing the wallpaper right behind each card at every frame for little
+     * cost. The refraction comes back when the row stops.
+     */
+    static boolean sliding;
     private static float backdropScale = 1f;
     /** Bumped whenever the backdrop changes, so cached surfaces (the dock band) know to redraw. */
     private static int generation;
@@ -209,11 +215,21 @@ final class LiquidGlass {
         return d;
     }
 
-    /** A round glass button (the X of a Continue watching card): the pills' glass, brighter while focused. */
-    static Drawable roundButton(float radiusPx, float density) {
+    /**
+     * The widgets row's cards and buttons: the glass without its wallpaper sample, which the row draws under them
+     * (GlassRow). What is left does not depend on where the card is, so it stays in the card's cached layer while the
+     * row slides. {@code veil} for the cards (as widgetCard), not for the round buttons.
+     */
+    static Drawable rowGlass(float radiusPx, float density, boolean veil) {
         StateListDrawable d = new StateListDrawable();
-        d.addState(new int[]{android.R.attr.state_focused}, new Surface(radiusPx, density, true));
-        d.addState(new int[0], new Surface(radiusPx, density, false));
+        for (boolean focused : new boolean[]{true, false}) {
+            Surface s = new Surface(radiusPx, density, focused);
+            s.samples = false;
+            s.veil = veil;
+            s.solid = false;
+            s.veilColor = focused ? 0x330A0A0E : 0x470A0A0E;
+            d.addState(focused ? new int[]{android.R.attr.state_focused} : new int[0], s);
+        }
         return d;
     }
 
@@ -248,6 +264,15 @@ final class LiquidGlass {
      * a scroll, and still sampled where the surface is on screen at that frame.
      */
     static void draw(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean bright, boolean refract) {
+        sample(canvas, rect, radius, host, p, refract);
+        overlay(canvas, rect, radius, p, bright);
+    }
+
+    /**
+     * The wallpaper behind {@code rect}, blurred (and bent near the rim when {@code refract}): the only part of the glass
+     * that depends on where it is on screen. The widgets row draws just this on every frame of a slide (GlassRow).
+     */
+    static void sample(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean refract) {
         Bitmap bg = backdrop;
         if (bg != null && host != null) {
             if (p.shaderBitmap != bg) {
@@ -285,6 +310,10 @@ final class LiquidGlass {
                 canvas.drawRoundRect(rect, radius, radius, p.blur);
             }
         }
+    }
+
+    /** The glass over the sample: tint, the sheen on its upper half and the rim. The same wherever it is on screen. */
+    static void overlay(Canvas canvas, RectF rect, float radius, Paints p, boolean bright) {
         float h = rect.height();
         if (p.sizedFor != h || p.sizedTop != rect.top || p.bright != bright || p.tintedOver != (backdrop != null)) {
             p.tintedOver = backdrop != null;
@@ -346,6 +375,8 @@ final class LiquidGlass {
         boolean veil;
         /** Menus: an almost opaque dark slab when there is no wallpaper to blur, so their rows stay readable. */
         boolean solid = true;
+        /** False: the wallpaper sample is drawn by someone else, under the view (GlassRow); this draws the rest. */
+        boolean samples = true;
         int veilColor = 0x6B0A0A0E;
         private final Paint veilPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -367,7 +398,8 @@ final class LiquidGlass {
                 veilPaint.setColor(0xF21C1C20);
                 canvas.drawRoundRect(rect, radius, radius, veilPaint);
             }
-            LiquidGlass.draw(canvas, rect, radius, cb instanceof View ? (View) cb : null, paints, bright);
+            if (samples) LiquidGlass.sample(canvas, rect, radius, cb instanceof View ? (View) cb : null, paints, !sliding);
+            LiquidGlass.overlay(canvas, rect, radius, paints, bright);
             if (veil && (backdrop != null || !solid)) {
                 veilPaint.setColor(veilColor);
                 canvas.drawRoundRect(rect, radius, radius, veilPaint);

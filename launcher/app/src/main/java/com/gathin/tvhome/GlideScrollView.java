@@ -16,15 +16,16 @@ import android.widget.HorizontalScrollView;
 public class GlideScrollView extends HorizontalScrollView {
     private static final long GLIDE_MS = 320;
     private ValueAnimator glide;
-    /** Run when a glide ends: the glass of the cards is redrawn once at their new place, not every frame. */
-    private Runnable settled;
+    /** Run when a glide starts and when the row stops (not between two glides that follow each other). */
+    private Runnable started, settled;
 
     public GlideScrollView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    void setOnSettled(Runnable r) {
-        settled = r;
+    void setOnGlide(Runnable start, Runnable end) {
+        started = start;
+        settled = end;
     }
 
     /** No jump: {@link #requestChildFocus} glides instead. */
@@ -53,8 +54,16 @@ public class GlideScrollView extends HorizontalScrollView {
         else if (r.right + margin > right) target = r.right + margin - getWidth() + getPaddingRight();
         int max = Math.max(0, getChildAt(0).getWidth() + getPaddingLeft() + getPaddingRight() - getWidth());
         target = Math.max(0, Math.min(max, target));
-        if (glide != null) glide.cancel();
-        if (target == from) return;
+        boolean wasGliding = glide != null && glide.isRunning();
+        if (glide != null) {
+            glide.removeAllListeners();
+            glide.cancel();
+        }
+        if (target == from) {
+            if (wasGliding && settled != null) settled.run();
+            return;
+        }
+        if (!wasGliding && started != null) started.run();
         glide = ValueAnimator.ofInt(from, target);
         glide.setDuration(GLIDE_MS);
         glide.setInterpolator(new DecelerateInterpolator(1.6f));

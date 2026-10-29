@@ -72,10 +72,12 @@ final class HomeWidgets {
 
     /** Advanced effects: the cards' glass is redrawn live while they zoom; otherwise cached, with a fade. */
     private final boolean advanced;
+    private final boolean liquidGlass;
 
     HomeWidgets(Activity activity, float density, boolean liquidGlass, boolean advanced, Runnable focusDock,
                 Runnable focusTopBar) {
         this.advanced = advanced;
+        this.liquidGlass = liquidGlass;
         this.activity = activity;
         this.focusDock = focusDock;
         this.focusTopBar = focusTopBar;
@@ -110,10 +112,10 @@ final class HomeWidgets {
         // Both cards take focus: the same brighter glass while focused.
         for (View card : new View[]{btcCard, playerCard}) {
             if (liquidGlass) {
-                card.setBackground(LiquidGlass.widgetCard(radius, density));
-                // Without advanced effects: cached as a layer, like the pills; the shader runs when the card changes.
-                // With them: drawn live, so the glass follows the card as it zooms.
-                if (!advanced) card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                // The row draws the wallpaper sample under the card (GlassRow); the rest of the glass and the content
+                // stay in the card's cached layer, only moved while the row slides.
+                card.setBackground(LiquidGlass.rowGlass(radius, density, true));
+                card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             } else {
                 StateListDrawable d = new StateListDrawable();
                 d.addState(new int[]{android.R.attr.state_focused}, flat(radius, 0x66FFFFFF, density));
@@ -122,10 +124,11 @@ final class HomeWidgets {
             }
         }
         btcCard.setOnFocusChangeListener((v, focused) -> focusCard(v, focused));
-        // The glass samples the wallpaper behind each card at its place on screen. While the row slides the cards
-        // carry their glass along (cached, nothing redrawn: smooth); it is redrawn once where they stop.
-        ((GlideScrollView) scroll).setOnSettled(this::invalidate);
+        // The glass samples the wallpaper behind each card at its place on screen, so the row redraws it on every
+        // frame of a slide: the plain blur meanwhile (LiquidGlass.sliding), the refraction where it stops.
+        ((GlideScrollView) scroll).setOnGlide(() -> sliding(true), () -> sliding(false));
         scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            row.invalidate();
             if (rowScrolled != null) rowScrolled.run();
         });
         btcCard.setOnKeyListener((v, keyCode, event) -> onMarketKey(keyCode, event));
@@ -166,7 +169,7 @@ final class HomeWidgets {
         if (focused) lastStop = v;
         if (!advanced) return;   // the background's own cross-fade is the whole animation
         v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(140)
-                .setUpdateListener(a -> v.invalidate()).start();
+                .setUpdateListener(a -> row.invalidate()).start();
     }
 
     private static GradientDrawable flat(float radius, int color, float density) {
@@ -175,6 +178,22 @@ final class HomeWidgets {
         d.setStroke(Math.round(density), 0x33FFFFFF);
         d.setCornerRadius(radius);
         return d;
+    }
+
+    /** A slide starts or stops: see the constructor. */
+    private void sliding(boolean on) {
+        LiquidGlass.sliding = on;
+        row.invalidate();
+    }
+
+    /** Tells the row which views to draw glass under: the cards, and the X buttons of Continue watching. */
+    private void updateGlass() {
+        if (!(row instanceof GlassRow) || !liquidGlass) return;
+        List<View> cards = new ArrayList<>();
+        cards.add(btcCard);
+        cards.add(playerCard);
+        cards.addAll(continueRow.cardViews());
+        ((GlassRow) row).setGlass(cards, continueRow.buttonViews());
     }
 
     void setOnRowScrolled(Runnable action) {
@@ -301,6 +320,7 @@ final class HomeWidgets {
         continueRow.start();
         applyOrder();
         updateRow();
+        updateGlass();
     }
 
     void stop() {
@@ -321,6 +341,7 @@ final class HomeWidgets {
     /** Repaints the glass cards, after the blurred backdrop behind them changed. */
     void invalidate() {
         if (row == null) return;
+        row.invalidate();
         btcCard.invalidate();
         playerCard.invalidate();
         continueRow.invalidate();
@@ -473,7 +494,7 @@ final class HomeWidgets {
         playerCard.setVisibility(View.VISIBLE);
         updateRow();
         if (!had) playerCard.setAlpha(0f);
-        if (!had) playerCard.animate().alpha(1f).setDuration(220).start();
+        if (!had) playerCard.animate().alpha(1f).setDuration(220).setUpdateListener(a -> row.invalidate()).start();
     }
 
     private static String firstNonEmpty(String... values) {

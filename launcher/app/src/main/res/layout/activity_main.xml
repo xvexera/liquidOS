@@ -318,7 +318,7 @@
                 android:overScrollMode="never"
                 android:visibility="gone">
 
-            <LinearLayout
+            <com.gathin.tvhome.GlassRow
                 android:id="@+id/widgets"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -516,7 +516,7 @@
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:visibility="gone" />
-            </LinearLayout>
+            </com.gathin.tvhome.GlassRow>
             </com.gathin.tvhome.GlideScrollView>
 
             <LinearLayout

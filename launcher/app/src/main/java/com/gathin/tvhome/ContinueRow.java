@@ -57,6 +57,7 @@ final class ContinueRow {
     private final boolean advanced;
     private final Host host;
     private final List<View> cards = new ArrayList<>();
+    private final List<View> glass = new ArrayList<>();
 
 
     ContinueRow(Activity activity, float density, boolean liquidGlass, boolean advanced, Host host) {
@@ -81,15 +82,32 @@ final class ContinueRow {
         return cards;
     }
 
-    /** Repaints the glass cards, after the blurred backdrop behind them (or their place on screen) changed. */
+    /** Repaints the glass cards and buttons, after the blurred backdrop behind them (or their place on screen) changed. */
     void invalidate() {
-        for (View c : cards) c.invalidate();
+        for (View v : glass) v.invalidate();
+    }
+
+    List<View> cardViews() {
+        return cards;
+    }
+
+    /** The X buttons. */
+    List<View> buttonViews() {
+        List<View> xs = new ArrayList<>(glass);
+        xs.removeAll(cards);
+        return xs;
+    }
+
+    /** The glass is drawn by the widgets row (GlassRow): it redraws when a card zooms or an X fades. */
+    private void redrawGlass() {
+        if (row != null && row.getParent() instanceof View) ((View) row.getParent()).invalidate();
     }
 
     void start() {
         if (row == null) return;
         row.removeAllViews();
         cards.clear();
+        glass.clear();
         if (Extras.continueWatching(activity)) {
             for (WatchHistory.Entry e : WatchHistory.load(activity)) {
                 if (cards.size() == MAX_CARDS) break;
@@ -113,9 +131,9 @@ final class ContinueRow {
         card.setTag(HomeWidgets.LIT_CARD);
         float radius = 22 * density;
         if (liquidGlass) {
-            card.setBackground(LiquidGlass.widgetCard(radius, density));
-            // Like the widget cards: a cached layer unless advanced effects redraw the glass while it zooms.
-            if (!advanced) card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            // Like the widget cards: the row draws the wallpaper sample under it (GlassRow), the rest is a cached layer.
+            card.setBackground(LiquidGlass.rowGlass(radius, density, true));
+            card.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         } else {
             StateListDrawable d = new StateListDrawable();
             d.addState(new int[]{android.R.attr.state_focused}, flat(radius, 0x66FFFFFF));
@@ -181,19 +199,21 @@ final class ContinueRow {
         View remove = removeButton();
         remove.setAlpha(0f);
         Runnable showRemove = () -> remove.animate().alpha(card.hasFocus() || remove.hasFocus() ? 1f : 0f)
-                .setDuration(120).start();
+                .setDuration(120).setUpdateListener(a -> redrawGlass()).start();
 
         card.setContentDescription(e.title);
         card.setOnFocusChangeListener((v, focused) -> {
             showRemove.run();
             if (!advanced) return;   // the background's own cross-fade is the whole animation
             v.animate().scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f).setDuration(140)
-                    .setUpdateListener(a -> v.invalidate()).start();
+                    .setUpdateListener(a -> redrawGlass()).start();
         });
         remove.setOnFocusChangeListener((v, focused) -> showRemove.run());
         card.setOnKeyListener((v, keyCode, event) -> onKey(card, remove, keyCode, event, false, () -> open(e)));
         remove.setOnKeyListener((v, keyCode, event) -> onKey(card, remove, keyCode, event, true, () -> remove(e)));
         cards.add(card);
+        glass.add(card);
+        glass.add(remove);
 
         LinearLayout item = new LinearLayout(activity);
         item.setOrientation(LinearLayout.VERTICAL);
@@ -215,8 +235,9 @@ final class ContinueRow {
         x.setPadding(dp(10), dp(10), dp(10), dp(10));
         x.setTag(HomeWidgets.LIT_PILL);
         if (liquidGlass) {
-            x.setBackground(LiquidGlass.roundButton(18 * density, density));
-            if (!advanced) x.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            // Round glass like the top bar's buttons, brighter while focused; the row draws its wallpaper sample.
+            x.setBackground(LiquidGlass.rowGlass(18 * density, density, false));
+            x.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             x.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
         } else {
             StateListDrawable bg = new StateListDrawable();
