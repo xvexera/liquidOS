@@ -248,4 +248,7 @@
     <string name="thanks_warning">⚠ חשוב: שלחו רק ב-BEP20 (BSC)</string>
     <string name="section_glass_motion">Liquid Glass ותנועה</string>
     <string name="credits_based_on">מבוסס על cleanyourtv מאת Gathin · רישיון MIT</string>
+    <string name="widget_continue">המשך צפייה</string>
+    <string name="continue_kicker">המשך צפייה · %1$s</string>
+    <string name="continue_left">נותרו %1$d דק׳</string>
 </resources>

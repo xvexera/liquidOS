@@ -116,6 +116,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private WallpaperPlayer wallpaperPlayer;
     /** BTC/USDT and now playing under the clock; see HomeWidgets. */
     private HomeWidgets widgets;
+    private ContinueRow continueRow;
     /** The light that crosses the focused tile (GlintView), kept on the glass highlight's place and size. */
     private GlintView glint;
     /** The dock band; told when the grid scrolls so its glass is moved, not redrawn, meanwhile. */
@@ -620,7 +621,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                     return true;
                 }
                 // Back to the dock tile Up came from, not wherever the focus finder lands.
-                focusTile(lastFocused % COLUMNS);
+                focusBelowWidgets();
                 return true;
             }
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs
@@ -690,8 +691,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // No wallpaper: give the glass the plain background to show until the first app glow arrives.
         scheduleGlowBackdrop();
         widgets = new HomeWidgets(this, density, liquidGlass, advancedEffects,
-                () -> focusTile(lastFocused % COLUMNS), () -> btnWifi.requestFocus());
+                this::focusBelowWidgets, () -> btnWifi.requestFocus());
         widgets.setOnMarketMenu(this::showMarketMenu);
+        continueRow = new ContinueRow(this, density, liquidGlass, advancedEffects, this::focusAboveContinue,
+                () -> focusTile(lastFocused % COLUMNS));
         // Not after recreate(): the launch intent survives it and would open the settings again.
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
@@ -781,6 +784,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updateInputsButton();
         if (showStats) startStats();
         widgets.start();
+        continueRow.start();
         if (calendarEvents != null) calendarEvents.start();
         refreshOnlineWallpaper(false);
         if (pendingSettingsAction != null) {
@@ -1971,7 +1975,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             if (position < COLUMNS) {
-                // dock row: a widget when one shows (the player, else the market card), else the top bar
+                // dock row: Continue watching when it shows, else a widget (the player, else the market card),
+                // else the top bar
+                if (continueRow != null && continueRow.shown()) {
+                    continueRow.focus();
+                    return true;
+                }
                 if (widgets != null && widgets.playerShown()) {
                     widgets.focusPlayer();
                     return true;
@@ -2054,6 +2063,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             pendingFocusScroll = null;
             grid.stopScroll();
         }
+    }
+
+    /** Down from the widgets (or the top bar with none): Continue watching when it shows, else the dock. */
+    private void focusBelowWidgets() {
+        if (continueRow != null && continueRow.shown()) continueRow.focus();
+        else focusTile(lastFocused % COLUMNS);
+    }
+
+    /** Up from Continue watching: the player, else the market card, else the top bar. */
+    private void focusAboveContinue() {
+        if (widgets != null && widgets.playerShown()) widgets.focusPlayer();
+        else if (widgets != null && widgets.marketShown()) widgets.focusMarket();
+        else btnWifi.requestFocus();
     }
 
     private void focusTile(int position) {
@@ -2803,6 +2825,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         grid.invalidateItemDecorations();
         if (widgets != null) widgets.invalidate();
+        if (continueRow != null) continueRow.invalidate();
     }
 
     private void showSettingsMenu() {
@@ -2878,9 +2901,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     /** Widgets: each one switched on or off in place; Home rebuilds once the menu closes. */
     private void showWidgetsMenu() {
-        String[] keys = {Extras.BTC_TICKER, Extras.NOW_PLAYING, Extras.CALENDAR};
-        int[] titles = {R.string.widget_btc, R.string.widget_music, R.string.widget_calendar};
-        boolean[] values = {Extras.btcTicker(this), Extras.nowPlaying(this), Extras.calendar(this)};
+        String[] keys = {Extras.BTC_TICKER, Extras.NOW_PLAYING, Extras.CONTINUE_WATCHING, Extras.CALENDAR};
+        int[] titles = {R.string.widget_btc, R.string.widget_music, R.string.widget_continue, R.string.widget_calendar};
+        boolean[] values = {Extras.btcTicker(this), Extras.nowPlaying(this), Extras.continueWatching(this),
+                Extras.calendar(this)};
         boolean[] changed = {false};
         List<View> items = new ArrayList<>();
         for (int i = 0; i < keys.length; i++) {
@@ -2894,6 +2918,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             row.setOnClickListener(v -> {
                 values[k] = !values[k];
                 getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE).edit().putBoolean(keys[k], values[k]).apply();
+                // Continue watching off: what it wrote down goes too.
+                if (keys[k].equals(Extras.CONTINUE_WATCHING) && !values[k]) WatchHistory.clear(this);
                 toggle.setChecked(values[k], true);
                 changed[0] = true;
             });

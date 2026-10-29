@@ -486,6 +486,20 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Continue watching: the videos the TV's apps played, as glass cards; see ContinueRow. Gone when it is
+                 switched off in Widgets or there is nothing to continue. -->
+            <LinearLayout
+                android:id="@+id/continueRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/widgets"
+                android:layout_alignStart="@id/leftBlock"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/topButtons"
                 android:layout_width="wrap_content"

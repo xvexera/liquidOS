@@ -252,4 +252,7 @@
     <string name="thanks_warning">⚠ IMPORTANT: send on BEP20 (BSC) only</string>
     <string name="section_glass_motion">Liquid Glass and motion</string>
     <string name="credits_based_on">Based on cleanyourtv by Gathin · MIT license</string>
+    <string name="widget_continue">Continue watching</string>
+    <string name="continue_kicker">Continue watching · %1$s</string>
+    <string name="continue_left">%1$d min left</string>
 </resources>

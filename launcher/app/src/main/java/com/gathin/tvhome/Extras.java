@@ -11,6 +11,8 @@ final class Extras {
     static final String BTC_TICKER = "btc_ticker";
     static final String NOW_PLAYING = "now_playing";
     static final String CALENDAR = "calendar_widget";
+    /** The Continue watching row on Home, and the history behind it (WatchHistory). */
+    static final String CONTINUE_WATCHING = "continue_watching";
     /** Days ahead the calendar pill counts events for: 1 to 30. */
     static final String CALENDAR_DAYS = "calendar_days";
     static final int CALENDAR_MAX_DAYS = 30;
@@ -108,6 +110,10 @@ final class Extras {
 
     static boolean nowPlaying(Context ctx) {
         return prefs(ctx).getBoolean(NOW_PLAYING, true);
+    }
+
+    static boolean continueWatching(Context ctx) {
+        return prefs(ctx).getBoolean(CONTINUE_WATCHING, true);
     }
 
     static boolean liquidGlass(Context ctx) {

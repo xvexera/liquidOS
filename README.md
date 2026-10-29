@@ -46,6 +46,10 @@ nothing uninstalled, and every change can be undone.
 - **Market**: BTC, ETH, S&P 500 and more, with a 24 h sparkline.
 - **Now playing**: the music or video playing on the TV, with controls.
 - **Calendar**: upcoming events from the Google accounts signed in on the TV, with a reminder.
+- **Continue watching**: the videos you left halfway in your apps, as glass cards with the picture, title and
+  time left. OK goes back to the video (YouTube and SmartTube at the same minute), a long OK removes it. Google
+  TV keeps its own list where only system apps can read it, so liquidOS keeps its own from what plays; music
+  apps are left out. Switch it off in *Settings > Widgets*, which also deletes the list.
 
 ### Night mode
 - **Artificial dimming** up to 100 % and **warm light** over every app.
@@ -106,8 +110,8 @@ To build the app yourself: `launcher\build-and-install.ps1` (JDK 17 and the Andr
 **liquidOS collects nothing.** No accounts, no analytics, no ads, no crash reporting, no tracking of any kind,
 and no server of mine that your TV or PC talks to. The code is open, so anyone can check.
 
-- **Everything stays on the TV**: your settings, uploaded wallpapers and calendar events never leave it. The
-  calendar is read on the TV only to show your next events.
+- **Everything stays on the TV**: your settings, uploaded wallpapers, calendar events and the Continue watching
+  list never leave it. The calendar is read on the TV only to show your next events.
 - **The only internet requests** go straight from the TV to public services, without any personal data, and
   only when you use those features:
   - **Wikimedia Commons**, for the rotating wallpapers.
