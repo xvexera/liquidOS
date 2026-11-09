@@ -254,4 +254,21 @@
     <string name="continue_remove">הסרה מהמשך צפייה</string>
     <string name="widget_order">עריכת סדר</string>
     <string name="continue_apps_hint">בחרו את האפליקציות שהסרטונים שלהן יופיעו בהמשך צפייה. אפליקציות מוזיקה לא מופיעות.</string>
+    <string name="continue_days">Delete after</string>
+    <string name="continue_days_hint">Videos you have not gone back to in this time leave the list.</string>
+    <string name="continue_days_never">Never</string>
+    <string name="continue_min_percent">Shows after watching</string>
+    <string name="continue_min_percent_hint">How much of a video you watch before it appears.</string>
+    <string name="continue_min_percent_start">30 s</string>
+    <string name="continue_min_minutes">Shortest video</string>
+    <string name="continue_min_minutes_hint">Shorter ones (music clips, shorts) are left out.</string>
+    <string name="continue_minutes_value">%1$d min</string>
+    <string name="continue_done_percent">Finished at</string>
+    <string name="continue_done_percent_hint">Watched this far, a video counts as finished and leaves the list.</string>
+    <string name="continue_cards">Cards on Home</string>
+    <plurals name="continue_days_value">
+        <item quantity="one">%1$d יום</item>
+        <item quantity="two">%1$d ימים</item>
+        <item quantity="other">%1$d ימים</item>
+    </plurals>
 </resources>

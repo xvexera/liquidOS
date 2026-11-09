@@ -214,4 +214,20 @@
     <string name="continue_remove">Quitar de Seguir viendo</string>
     <string name="widget_order">Editar orden</string>
     <string name="continue_apps_hint">Elige las apps cuyos videos aparecen en Seguir viendo. Las de música nunca aparecen.</string>
+    <string name="continue_days">Borrar después de</string>
+    <string name="continue_days_hint">Los videos que no retomes en este tiempo salen de la lista.</string>
+    <string name="continue_days_never">Nunca</string>
+    <string name="continue_min_percent">Aparece después de ver</string>
+    <string name="continue_min_percent_hint">Cuánto de un video tienes que ver para que aparezca.</string>
+    <string name="continue_min_percent_start">30 s</string>
+    <string name="continue_min_minutes">Video más corto</string>
+    <string name="continue_min_minutes_hint">Los más cortos (clips de música, shorts) no aparecen.</string>
+    <string name="continue_minutes_value">%1$d min</string>
+    <string name="continue_done_percent">Terminado al</string>
+    <string name="continue_done_percent_hint">Visto hasta aquí, un video cuenta como terminado y sale de la lista.</string>
+    <string name="continue_cards">Tarjetas en el inicio</string>
+    <plurals name="continue_days_value">
+        <item quantity="one">%1$d día</item>
+        <item quantity="other">%1$d días</item>
+    </plurals>
 </resources>

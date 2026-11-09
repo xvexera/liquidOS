@@ -15,6 +15,19 @@ final class Extras {
     static final String CONTINUE_WATCHING = "continue_watching";
     /** Apps switched off in the Continue watching app picker (package names); new apps start switched on. */
     static final String CONTINUE_APPS_OFF = "continue_apps_off";
+    /** Continue watching, Launcher settings: days an untouched video stays (0: for good), how much of it must be
+     *  watched before it shows (0: just started, else percent), its shortest length, where it counts as finished,
+     *  and how many cards Home shows. Each has its choices next to it. */
+    static final String CONTINUE_DAYS = "continue_days";
+    static final int[] CONTINUE_DAYS_CHOICES = {1, 3, 7, 14, 30, 0};
+    static final String CONTINUE_MIN_PERCENT = "continue_min_percent";
+    static final int[] CONTINUE_MIN_PERCENT_CHOICES = {0, 5, 10, 20, 35, 50};
+    static final String CONTINUE_MIN_MINUTES = "continue_min_minutes";
+    static final int[] CONTINUE_MIN_MINUTES_CHOICES = {1, 4, 10, 20};
+    static final String CONTINUE_DONE_PERCENT = "continue_done_percent";
+    static final int[] CONTINUE_DONE_PERCENT_CHOICES = {90, 95, 98};
+    static final String CONTINUE_CARDS = "continue_cards";
+    static final int[] CONTINUE_CARDS_CHOICES = {2, 3, 4, 5, 6, 7, 8};
     /** Order of the cards in the widgets row: "market", "player", "continue", comma-separated. */
     static final String WIDGET_ORDER = "widget_order";
     static final String[] WIDGETS = {"market", "player", "continue"};
@@ -119,6 +132,26 @@ final class Extras {
 
     static boolean continueWatching(Context ctx) {
         return prefs(ctx).getBoolean(CONTINUE_WATCHING, true);
+    }
+
+    static int continueDays(Context ctx) {
+        return prefs(ctx).getInt(CONTINUE_DAYS, 30);
+    }
+
+    static int continueMinPercent(Context ctx) {
+        return prefs(ctx).getInt(CONTINUE_MIN_PERCENT, 0);
+    }
+
+    static int continueMinMinutes(Context ctx) {
+        return prefs(ctx).getInt(CONTINUE_MIN_MINUTES, 4);
+    }
+
+    static int continueDonePercent(Context ctx) {
+        return prefs(ctx).getInt(CONTINUE_DONE_PERCENT, 95);
+    }
+
+    static int continueCards(Context ctx) {
+        return prefs(ctx).getInt(CONTINUE_CARDS, 6);
     }
 
     static java.util.Set<String> continueAppsOff(Context ctx) {

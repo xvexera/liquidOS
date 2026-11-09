@@ -61,15 +61,17 @@ final class WatchHistory {
     }
 
     /** Entries kept; Home shows the newest few. */
-    private static final int MAX = 8;
-    /** A video shorter than this is a clip, not something to come back to; live streams report no length at all. */
-    private static final long MIN_DURATION_MS = 4 * 60_000L;
+    private static final int MAX = 20;
+    /**
+     * The lowest of the choices in Launcher settings: recording keeps everything that could show under any of them,
+     * and Home applies the ones chosen (see {@link #shows}), so a change shows at once. Live streams report no length.
+     */
+    private static final long MIN_DURATION_MS = 60_000L;
     /** Less than this watched: just sampled, not started. */
     private static final long MIN_POSITION_MS = 30_000L;
-    /** Watched to here (or to the last two minutes): finished, so it leaves the list. */
-    private static final int DONE_PERCENT = 95;
-    private static final long DONE_LEFT_MS = 2 * 60_000L;
-    private static final long MAX_AGE_MS = 30L * 24 * 60 * 60_000L;
+    /** In its last minute a video is finished, whatever the percentage chosen. */
+    private static final long DONE_LEFT_MS = 60_000L;
+    private static final long DAY_MS = 24L * 60 * 60_000L;
     private static final int THUMB_WIDTH = 320;
     /** Music apps' sessions are songs, not something to continue watching. */
     private static final String[] MUSIC = {"com.spotify.tv.android", "com.google.android.youtube.tvmusic",
@@ -148,6 +150,9 @@ final class WatchHistory {
         try {
             JSONArray a = new JSONArray(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
             long now = System.currentTimeMillis();
+            // Untouched for the days chosen in Launcher settings: gone (0 keeps them for good).
+            int days = Extras.continueDays(ctx);
+            long maxAge = days > 0 ? days * DAY_MS : Long.MAX_VALUE;
             for (int i = 0; i < a.length(); i++) {
                 JSONObject o = a.getJSONObject(i);
                 Entry e = new Entry();
@@ -159,7 +164,7 @@ final class WatchHistory {
                 e.durationMs = o.optLong("duration");
                 e.updatedAt = o.optLong("updated");
                 e.art = o.optString("art");
-                if (!e.pkg.isEmpty() && !e.title.isEmpty() && now - e.updatedAt < MAX_AGE_MS) list.add(e);
+                if (!e.pkg.isEmpty() && !e.title.isEmpty() && now - e.updatedAt < maxAge) list.add(e);
             }
         } catch (IOException | JSONException damaged) {
             // a half-written file: start over rather than show nothing forever
@@ -250,7 +255,8 @@ final class WatchHistory {
         List<Entry> list = load(ctx);
         Entry e = null;
         for (Entry x : list) if (x.pkg.equals(pkg) && x.title.equals(title)) e = x;
-        boolean done = position * 100 >= (long) DONE_PERCENT * duration || duration - position <= DONE_LEFT_MS;
+        boolean done = position * 100 >= (long) Extras.continueDonePercent(ctx) * duration
+                || duration - position <= DONE_LEFT_MS;
         if (done || position < MIN_POSITION_MS) {
             // Finished: off the list. Barely started: not on it (but a started one keeps its place).
             if (e != null && done) {
@@ -284,6 +290,16 @@ final class WatchHistory {
         while (list.size() > MAX) list.remove(list.size() - 1);
         save(ctx, list);
         return pkg.equals(YOUTUBE_TV) && !hasVideoId(e) && list.contains(e) ? e : null;
+    }
+
+    /**
+     * Whether Home shows {@code e} under the choices in Launcher settings: long enough, watched far enough, and not
+     * past the point where it counts as finished.
+     */
+    static boolean shows(Context ctx, Entry e) {
+        if (e.durationMs < Extras.continueMinMinutes(ctx) * 60_000L) return false;
+        int percent = e.percent();
+        return percent >= Extras.continueMinPercent(ctx) && percent < Extras.continueDonePercent(ctx);
     }
 
     static boolean hasVideoId(Entry e) {

@@ -95,8 +95,23 @@ public final class LauncherSettingsActivity extends Activity {
         stepper(home, getString(R.string.clock_style), getString(R.string.clock_style_hint), styles,
                 Math.max(0, styleAt), i -> choices.edit().putString(Extras.CLOCK_STYLE, Extras.CLOCK_STYLES[i]).apply());
 
-        // Continue watching: which apps it follows; new apps start switched on.
+        // Continue watching: how long videos stay, when they show, and which apps it follows.
         LinearLayout watching = section(left, R.string.widget_continue);
+        choice(watching, R.string.continue_days, R.string.continue_days_hint, Extras.CONTINUE_DAYS,
+                Extras.CONTINUE_DAYS_CHOICES, Extras.continueDays(this),
+                d -> d == 0 ? getString(R.string.continue_days_never)
+                        : getResources().getQuantityString(R.plurals.continue_days_value, d, d));
+        choice(watching, R.string.continue_min_percent, R.string.continue_min_percent_hint,
+                Extras.CONTINUE_MIN_PERCENT, Extras.CONTINUE_MIN_PERCENT_CHOICES, Extras.continueMinPercent(this),
+                p -> p == 0 ? getString(R.string.continue_min_percent_start) : p + "%");
+        choice(watching, R.string.continue_min_minutes, R.string.continue_min_minutes_hint,
+                Extras.CONTINUE_MIN_MINUTES, Extras.CONTINUE_MIN_MINUTES_CHOICES, Extras.continueMinMinutes(this),
+                m -> getString(R.string.continue_minutes_value, m));
+        choice(watching, R.string.continue_done_percent, R.string.continue_done_percent_hint,
+                Extras.CONTINUE_DONE_PERCENT, Extras.CONTINUE_DONE_PERCENT_CHOICES, Extras.continueDonePercent(this),
+                p -> p + "%");
+        choice(watching, R.string.continue_cards, 0, Extras.CONTINUE_CARDS, Extras.CONTINUE_CARDS_CHOICES,
+                Extras.continueCards(this), String::valueOf);
         TextView watchingHint = text(getString(R.string.continue_apps_hint), 13, R.font.outfit_regular, 0x99FFFFFF);
         watchingHint.setPadding(dp(4), 0, dp(4), dp(8));
         watching.addView(watchingHint);
@@ -423,6 +438,19 @@ public final class LauncherSettingsActivity extends Activity {
         }
         panel.addView(row);
         return row;
+    }
+
+    /** A stepper over {@code values} saved under {@code key}, each shown as {@code label} gives it. */
+    private void choice(LinearLayout panel, int title, int hint, String key, int[] values, int current,
+                        java.util.function.IntFunction<String> label) {
+        String[] labels = new String[values.length];
+        int at = 0;
+        for (int i = 0; i < values.length; i++) {
+            labels[i] = label.apply(values[i]);
+            if (values[i] == current) at = i;
+        }
+        stepper(panel, getString(title), hint == 0 ? null : getString(hint), labels, at,
+                i -> choices.edit().putInt(key, values[i]).apply());
     }
 
     private View toggle(LinearLayout panel, String title, String hint, boolean on,

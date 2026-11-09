@@ -44,7 +44,6 @@ final class ContinueRow {
         void down();
     }
 
-    private static final int MAX_CARDS = 6;
     /** Apps that open https://www.youtube.com/watch links themselves, with the start time. */
     private static final String[] YOUTUBE = {WatchHistory.YOUTUBE_TV, "com.google.android.youtube.tvkids",
             "com.google.android.youtube.tvunplugged", "org.smarttube.stable", "org.smarttube.beta",
@@ -109,9 +108,10 @@ final class ContinueRow {
         cards.clear();
         glass.clear();
         if (Extras.continueWatching(activity)) {
+            int max = Extras.continueCards(activity);
             for (WatchHistory.Entry e : WatchHistory.load(activity)) {
-                if (cards.size() == MAX_CARDS) break;
-                if (!installed(e.pkg) || !WatchHistory.appOn(activity, e.pkg)) continue;
+                if (cards.size() == max) break;
+                if (!installed(e.pkg) || !WatchHistory.appOn(activity, e.pkg) || !WatchHistory.shows(activity, e)) continue;
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT);
                 if (!cards.isEmpty()) lp.setMarginStart(dp(14));
