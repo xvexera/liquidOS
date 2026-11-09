@@ -7,10 +7,13 @@ import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.service.notification.NotificationListenerService;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Exists so Android lets the launcher read the active media sessions (MediaSessionManager.getActiveSessions
@@ -27,7 +30,6 @@ public class MediaListener extends NotificationListenerService {
     private HandlerThread thread;
     private Handler worker;
     private MediaSessionManager manager;
-    private final List<MediaController> followed = new ArrayList<>();
 
     private final MediaSessionManager.OnActiveSessionsChangedListener sessionsChanged = this::follow;
 
@@ -35,11 +37,15 @@ public class MediaListener extends NotificationListenerService {
         @Override
         public void run() {
             boolean playing = false;
-            for (MediaController c : followed) {
-                PlaybackState s = c.getPlaybackState();
-                if (s != null && s.getState() == PlaybackState.STATE_PLAYING) {
-                    lookUp(WatchHistory.record(MediaListener.this, c));
-                    playing = true;
+            for (Watcher w : watchers) {
+                try {
+                    PlaybackState s = w.controller.getPlaybackState();
+                    if (s != null && s.getState() == PlaybackState.STATE_PLAYING) {
+                        w.record();
+                        playing = true;
+                    }
+                } catch (RuntimeException gone) {
+                    // the session died; the sessions listener takes it off the list
                 }
             }
             if (playing) worker.postDelayed(this, SAMPLE_MS);
@@ -48,9 +54,17 @@ public class MediaListener extends NotificationListenerService {
 
     private final class Watcher extends MediaController.Callback {
         final MediaController controller;
+        /** The session's metadata without its pictures, as last reported; null until asked or reported. */
+        private MediaMetadata known;
 
         Watcher(MediaController controller) {
             this.controller = controller;
+        }
+
+        /** Writes down where the video is, asking the app for its metadata only the first time. */
+        void record() {
+            if (known == null) known = WatchHistory.light(controller.getMetadata());
+            lookUp(WatchHistory.record(MediaListener.this, controller, known));
         }
 
         @Override
@@ -65,7 +79,7 @@ public class MediaListener extends NotificationListenerService {
                 case PlaybackState.STATE_STOPPED:
                 case PlaybackState.STATE_SKIPPING_TO_NEXT:
                 case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
-                    lookUp(WatchHistory.record(MediaListener.this, controller));
+                    record();
                     break;
                 default:
                     break;
@@ -74,13 +88,32 @@ public class MediaListener extends NotificationListenerService {
 
         @Override
         public void onMetadataChanged(MediaMetadata metadata) {
-            lookUp(WatchHistory.record(MediaListener.this, controller));
+            known = WatchHistory.light(metadata);
+            record();
         }
     }
 
-    /** A YouTube video without its id: looked up once, on the worker thread (it is network). */
+    private static final long LOOKUP_WAIT_MS = 2 * 60_000L, LOOKUP_WAIT_MAX_MS = 2 * 60 * 60_000L;
+    /** Lookups that found nothing, by video: when to try again and the wait that led there. */
+    private final Map<String, long[]> lookups = new HashMap<>();
+
+    /**
+     * A YouTube video without its id: looked up on the worker thread (it is network). A lookup that fails (offline, or
+     * YouTube has no such video) is tried again after two minutes, then four, up to every two hours: each try
+     * downloads a whole results page, and the video is written down every minute while it plays.
+     */
     private void lookUp(WatchHistory.Entry e) {
-        if (e != null) WatchHistory.findYouTubeId(this, e);
+        if (e == null) return;
+        long now = SystemClock.elapsedRealtime();
+        long[] last = lookups.get(e.key());
+        if (last != null && now < last[0]) return;
+        if (WatchHistory.findYouTubeId(this, e) != null) {
+            lookups.remove(e.key());
+            return;
+        }
+        long wait = last == null ? LOOKUP_WAIT_MS : Math.min(last[1] * 2, LOOKUP_WAIT_MAX_MS);
+        if (lookups.size() > 40) lookups.clear();
+        lookups.put(e.key(), new long[]{now + wait, wait});
     }
 
     private final List<Watcher> watchers = new ArrayList<>();
@@ -118,20 +151,18 @@ public class MediaListener extends NotificationListenerService {
         for (Watcher w : watchers) {
             w.controller.unregisterCallback(w);
             try {
-                WatchHistory.record(this, w.controller);
+                WatchHistory.record(this, w.controller, w.known);
             } catch (RuntimeException gone) {
                 // the session died before it could be read; its last pause or minute was written already
             }
         }
         watchers.clear();
-        followed.clear();
         if (sessions == null) return;
         for (MediaController c : sessions) {
             if (WatchHistory.isMusicApp(this, c.getPackageName())) continue;
             Watcher w = new Watcher(c);
             c.registerCallback(w, worker);
             watchers.add(w);
-            followed.add(c);
         }
         worker.removeCallbacks(sample);
         sample.run();

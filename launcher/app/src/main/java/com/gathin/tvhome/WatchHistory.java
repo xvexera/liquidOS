@@ -237,15 +237,30 @@ final class WatchHistory {
         return Math.max(0, pos);
     }
 
+    /** {@code m} without its pictures: what {@link #record} needs every minute, a few strings and a length. */
+    static MediaMetadata light(MediaMetadata m) {
+        if (m == null) return null;
+        try {
+            return new MediaMetadata.Builder(m).putBitmap(MediaMetadata.METADATA_KEY_ART, null)
+                    .putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, null)
+                    .putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, null).build();
+        } catch (RuntimeException e) {
+            return m;
+        }
+    }
+
     /**
      * Writes down where {@code c}'s video is, or drops it once finished. Called off the main thread. Returns the
      * entry when it still needs its YouTube video id (see {@link #findYouTubeId}), else null.
+     *
+     * {@code known} is the session's metadata as last reported (see {@link #light}), or null to ask the session: asking
+     * brings the picture over from the app every time, which the minute by minute sample does not need.
      */
-    static synchronized Entry record(Context ctx, MediaController c) {
+    static synchronized Entry record(Context ctx, MediaController c, MediaMetadata known) {
         if (!Extras.continueWatching(ctx)) return null;
         String pkg = c.getPackageName();
         if (pkg == null || pkg.equals(ctx.getPackageName()) || isMusicApp(ctx, pkg) || !appOn(ctx, pkg)) return null;
-        MediaMetadata m = c.getMetadata();
+        MediaMetadata m = known != null ? known : c.getMetadata();
         if (m == null) return null;
         String title = text(m, MediaMetadata.METADATA_KEY_TITLE, MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
         long duration = m.getLong(MediaMetadata.METADATA_KEY_DURATION);
@@ -279,12 +294,12 @@ final class WatchHistory {
         e.positionMs = position;
         e.durationMs = duration;
         e.updatedAt = System.currentTimeMillis();
-        Bitmap art = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
-        if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
-        if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
-        if (art != null && (e.art.isEmpty() || !new File(dir(ctx), e.art).isFile())) {
+        if (e.art.isEmpty() || !new File(dir(ctx), e.art).isFile()) {
+            // No picture yet: the only time the session's own is needed.
+            Bitmap art = art(m);
+            if (art == null && known != null) art = art(c.getMetadata());
             String name = String.format(Locale.ROOT, "%08x.jpg", e.key().hashCode());
-            if (writeThumb(ctx, art, name)) e.art = name;
+            if (art != null && writeThumb(ctx, art, name)) e.art = name;
         }
         list.sort((x, y) -> Long.compare(y.updatedAt, x.updatedAt));
         while (list.size() > MAX) list.remove(list.size() - 1);
@@ -300,6 +315,14 @@ final class WatchHistory {
         if (e.durationMs < Extras.continueMinMinutes(ctx) * 60_000L) return false;
         int percent = e.percent();
         return percent >= Extras.continueMinPercent(ctx) && percent < Extras.continueDonePercent(ctx);
+    }
+
+    private static Bitmap art(MediaMetadata m) {
+        if (m == null) return null;
+        Bitmap art = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
+        if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+        if (art == null) art = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+        return art;
     }
 
     static boolean hasVideoId(Entry e) {

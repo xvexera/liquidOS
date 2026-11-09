@@ -47,6 +47,14 @@ public class GlassRow extends LinearLayout {
 
     /** The views to draw glass under: {@code cards} with 22dp corners and a veil, {@code buttons} round. */
     void setGlass(List<View> cards, List<View> buttons) {
+        if (slabs.size() == cards.size() + buttons.size()) {
+            boolean same = true;
+            for (int i = 0; i < slabs.size() && same; i++) {
+                View v = i < cards.size() ? cards.get(i) : buttons.get(i - cards.size());
+                same = slabs.get(i).view == v && slabs.get(i).card == (i < cards.size());
+            }
+            if (same) return;   // every return to Home asks again
+        }
         slabs.clear();
         for (View v : cards) slabs.add(new Slab(v, 22 * density, true, density));
         for (View v : buttons) slabs.add(new Slab(v, 0f, false, density));

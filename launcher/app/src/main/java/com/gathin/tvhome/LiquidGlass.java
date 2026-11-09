@@ -294,9 +294,9 @@ final class LiquidGlass {
             float sx = host.getScaleX(), sy = host.getScaleY();
             if (sx > 0f && sy > 0f && (sx != 1f || sy != 1f)) p.matrix.postScale(1f / sx, 1f / sy);
             p.shader.setLocalMatrix(p.matrix);
-            if (refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && p.refraction != null
-                    && canvas.isHardwareAccelerated()) {
-                RuntimeShader r = (RuntimeShader) p.refraction;
+            if (refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && canvas.isHardwareAccelerated()
+                    && p.refraction() != null) {
+                RuntimeShader r = (RuntimeShader) p.refraction();
                 r.setInputShader("backdrop", p.shader);
                 r.setFloatUniform("center", rect.centerX(), rect.centerY());
                 r.setFloatUniform("halfSize", rect.width() / 2f, rect.height() / 2f);
@@ -346,7 +346,8 @@ final class LiquidGlass {
         final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
         final Paint lens = new Paint(Paint.ANTI_ALIAS_FLAG);
         /** A RuntimeShader on Android 13+, else null; Object so this class loads on older TVs. */
-        final Object refraction = newRefraction();
+        private Object refraction;
+        private boolean refractionMade;
         /** How far in from the rim the glass bends the backdrop. */
         float bezel;
         boolean tintedOver;
@@ -361,6 +362,18 @@ final class LiquidGlass {
             bezel = 12 * density;
             rim.setStyle(Paint.Style.STROKE);
             rim.setStrokeWidth(1.2f * density);
+        }
+
+        /**
+         * Made the first time this surface refracts: the widgets row's cards never do (the row draws their sample),
+         * and each shader is a native object the collector is slow to give back.
+         */
+        Object refraction() {
+            if (!refractionMade) {
+                refractionMade = true;
+                refraction = newRefraction();
+            }
+            return refraction;
         }
     }
 

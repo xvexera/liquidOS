@@ -42,6 +42,9 @@ final class ContinueRow {
         void up();
 
         void down();
+
+        /** The cards were rebuilt: the row lays them out and draws glass under the new ones. */
+        void changed();
     }
 
     /** Apps that open https://www.youtube.com/watch links themselves, with the start time. */
@@ -57,7 +60,12 @@ final class ContinueRow {
     private final Host host;
     private final List<View> cards = new ArrayList<>();
     private final List<View> glass = new ArrayList<>();
-
+    /** What the cards show (videos, positions, pictures): start() rebuilds them only when it changes. */
+    private String shown;
+    /** The decoded pictures, by file name and date: a rebuild decodes only the new ones. */
+    private final java.util.Map<String, Bitmap> thumbs = new java.util.HashMap<>();
+    /** A YouTube id is being looked up to open a video: OK again does not open it twice. */
+    private boolean opening;
 
     ContinueRow(Activity activity, float density, boolean liquidGlass, boolean advanced, Host host) {
         this.activity = activity;
@@ -102,23 +110,64 @@ final class ContinueRow {
         if (row != null && row.getParent() instanceof View) ((View) row.getParent()).invalidate();
     }
 
+    /**
+     * Shows the history as it is now. Home calls it on every return, and most of the time nothing changed: the cards
+     * are rebuilt (views, layers, pictures) only when a video, its position or its picture did. Focus on a card or its
+     * X stays at the same place in the row.
+     */
     void start() {
         if (row == null) return;
-        row.removeAllViews();
-        cards.clear();
-        glass.clear();
+        List<WatchHistory.Entry> entries = new ArrayList<>();
+        StringBuilder now = new StringBuilder();
         if (Extras.continueWatching(activity)) {
             int max = Extras.continueCards(activity);
             for (WatchHistory.Entry e : WatchHistory.load(activity)) {
-                if (cards.size() == max) break;
+                if (entries.size() == max) break;
                 if (!installed(e.pkg) || !WatchHistory.appOn(activity, e.pkg) || !WatchHistory.shows(activity, e)) continue;
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
-                if (!cards.isEmpty()) lp.setMarginStart(dp(14));
-                row.addView(card(e), lp);
+                entries.add(e);
+                now.append(e.key()).append('\n').append(e.positionMs).append('/').append(e.durationMs).append('/')
+                        .append(thumbKey(e)).append('\n');
             }
         }
+        if (now.toString().equals(shown)) return;
+        shown = now.toString();
+        int focusAt = -1;
+        for (int i = 0; i < row.getChildCount(); i++) if (row.getChildAt(i).hasFocus()) focusAt = i;
+        row.removeAllViews();
+        cards.clear();
+        glass.clear();
+        java.util.Set<String> used = new java.util.HashSet<>();
+        for (WatchHistory.Entry e : entries) {
+            used.add(thumbKey(e));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (!cards.isEmpty()) lp.setMarginStart(dp(14));
+            row.addView(card(e), lp);
+        }
+        thumbs.keySet().retainAll(used);
         row.setVisibility(cards.isEmpty() ? View.GONE : View.VISIBLE);
+        host.changed();
+        if (focusAt >= 0) {
+            if (cards.isEmpty()) host.down();
+            else cards.get(Math.min(focusAt, cards.size() - 1)).requestFocus();
+        }
+    }
+
+    /** The picture's file and when it was written (YouTube's own picture replaces the session's under the same name). */
+    private String thumbKey(WatchHistory.Entry e) {
+        java.io.File f = WatchHistory.artFile(activity, e);
+        return f == null ? "" : f.getName() + '@' + f.lastModified();
+    }
+
+    private Bitmap thumb(WatchHistory.Entry e) {
+        String key = thumbKey(e);
+        if (key.isEmpty()) return null;
+        Bitmap b = thumbs.get(key);
+        if (b == null) {
+            b = WatchHistory.thumb(activity, e);
+            if (b != null) thumbs.put(key, b);
+        }
+        return b;
     }
 
     private View card(WatchHistory.Entry e) {
@@ -144,7 +193,7 @@ final class ContinueRow {
         // The picture, 16:9 with rounded corners; the app's banner when the video brought none.
         ImageView art = new ImageView(activity);
         art.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        Bitmap thumb = WatchHistory.thumb(activity, e);
+        Bitmap thumb = thumb(e);
         if (thumb != null) art.setImageBitmap(thumb);
         else art.setImageDrawable(banner(e.pkg));
         float artRadius = 10 * density;
@@ -285,14 +334,10 @@ final class ContinueRow {
         }
     }
 
-    /** The X: off the history and the row; focus goes to the next card (or the one before, or the dock). */
+    /** The X: off the history and the row; focus goes to the next card (or the one before, or the dock): see start(). */
     private void remove(WatchHistory.Entry e) {
-        int at = -1;
-        for (int i = 0; i < cards.size(); i++) if (cards.get(i).hasFocus()) at = i;
         WatchHistory.remove(activity, e);
         start();
-        if (!cards.isEmpty()) cards.get(Math.max(0, Math.min(at, cards.size() - 1))).requestFocus();
-        else host.down();
     }
 
     /**
@@ -321,9 +366,14 @@ final class ContinueRow {
                 if (watch(e)) return;
             } else if (e.pkg.equals(WatchHistory.YOUTUBE_TV)) {
                 // Not looked up yet (YouTube was offline when it played): look it up now, then open it.
+                if (opening) return;
+                opening = true;
                 Thread t = new Thread(() -> {
                     String id = WatchHistory.findYouTubeId(activity, e);
                     activity.runOnUiThread(() -> {
+                        opening = false;
+                        // Home was closed or rebuilt while YouTube answered: nothing to open from.
+                        if (activity.isFinishing() || activity.isDestroyed()) return;
                         if (id == null || !watch(e)) launch(e.pkg);
                     });
                 }, "continue-youtube");

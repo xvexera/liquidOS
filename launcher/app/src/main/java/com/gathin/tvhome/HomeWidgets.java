@@ -100,6 +100,13 @@ final class HomeWidgets {
             public void down() {
                 focusDock.run();
             }
+
+            @Override
+            public void changed() {
+                // Also after an X took a card off: the cards left are new views, with no glass under them yet.
+                updateRow();
+                updateGlass();
+            }
         });
         btcCard = activity.findViewById(R.id.btcCard);
         playerCard = activity.findViewById(R.id.playerCard);
@@ -443,14 +450,16 @@ final class HomeWidgets {
     private void showSession(MediaController c) {
         if (row == null) return;
         boolean had = playerShown();
-        if (c == null || c.getMetadata() == null || c.getPlaybackState() == null) {
+        // Asked once: every call brings the whole metadata over from the app, cover included.
+        MediaMetadata m = c == null ? null : c.getMetadata();
+        android.media.session.PlaybackState state = c == null ? null : c.getPlaybackState();
+        if (m == null || state == null) {
             boolean wasFocused = playerCard.hasFocus();
             playerCard.setVisibility(View.GONE);
             updateRow();
             if (wasFocused) focusDock.run();
             return;
         }
-        MediaMetadata m = c.getMetadata();
         String title = m.getString(MediaMetadata.METADATA_KEY_TITLE);
         String artist = firstNonEmpty(m.getString(MediaMetadata.METADATA_KEY_ARTIST),
                 m.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST), m.getString(MediaMetadata.METADATA_KEY_ALBUM));
@@ -458,7 +467,7 @@ final class HomeWidgets {
         TextView artistView = activity.findViewById(R.id.playerArtist);
         artistView.setText(artist);
         artistView.setVisibility(artist == null ? View.GONE : View.VISIBLE);
-        boolean playing = NowPlaying.isPlaying(c.getPlaybackState().getState());
+        boolean playing = NowPlaying.isPlaying(state.getState());
         String app = appLabel(c.getPackageName());
         ((TextView) activity.findViewById(R.id.playerKicker)).setText(activity.getString(
                 playing ? R.string.now_playing_from : R.string.paused_from, app));
@@ -468,6 +477,8 @@ final class HomeWidgets {
         Bitmap bitmap = m.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
         if (bitmap == null) bitmap = m.getBitmap(MediaMetadata.METADATA_KEY_ART);
         if (bitmap == null) bitmap = m.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+        if (bitmap != null) bitmap = coverSized(bitmap);
+        if (bitmap != null && shownArt != null && bitmap != shownArt && bitmap.sameAs(shownArt)) bitmap = shownArt;
         // Apps send a new track's title first and its cover a moment later: keep the old cover until then.
         if (bitmap == null && shownArt != null && c.getPackageName().equals(shownArtPackage)) bitmap = shownArt;
         if (bitmap != null) {
@@ -495,6 +506,21 @@ final class HomeWidgets {
         updateRow();
         if (!had) playerCard.setAlpha(0f);
         if (!had) playerCard.animate().alpha(1f).setDuration(220).setUpdateListener(a -> row.invalidate()).start();
+    }
+
+    /**
+     * The cover no larger than the card shows it: apps send it at up to 1280 x 720 (3.7 MB kept for as long as the
+     * card is up), the card draws it a few dozen dp wide.
+     */
+    private static Bitmap coverSized(Bitmap cover) {
+        int max = 320, w = cover.getWidth(), h = cover.getHeight();
+        if (Math.max(w, h) <= max) return cover;
+        float s = max / (float) Math.max(w, h);
+        try {
+            return Bitmap.createScaledBitmap(cover, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), true);
+        } catch (RuntimeException | OutOfMemoryError e) {
+            return cover;
+        }
     }
 
     private static String firstNonEmpty(String... values) {

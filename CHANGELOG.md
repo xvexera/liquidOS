@@ -14,6 +14,16 @@ New options in *Launcher settings > Continue watching*, above the app picker. Th
 - **Cards on Home**: 2 to 8.
 - Changes apply at once, also to the videos already on the list; the list now keeps up to 20 videos.
 
+### Fixes and lighter work
+- **X on a Continue watching card**: the cards left keep their glass, and focus goes to the next card instead of
+  the first.
+- **Back on Home**: the Continue watching cards are rebuilt only when a video, its position or its picture
+  changed, and focus stays where it was. Glass that never refracts no longer makes a shader.
+- **While a video plays**: its position is written every minute without bringing its picture over from the app
+  each time; a YouTube lookup that fails is tried again after 2 minutes, then 4, up to every 2 hours, instead of
+  every minute.
+- **Now playing**: the cover is kept at the size the card shows, not the size the app sends.
+
 ## 2026-10-29
 
 ### New: Continue watching
