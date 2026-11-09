@@ -234,6 +234,10 @@ final class WallpaperPlayer {
         fade.setCrossFadeEnabled(true);
         image.setImageDrawable(fade);
         fade.startTransition(FADE_MS);
+        // Once it has faded, the picture alone: the transition would keep the one before it in memory until the next.
+        image.postDelayed(() -> {
+            if (image.getDrawable() == fade) image.setImageDrawable(next);
+        }, FADE_MS + 200);
         if (onImage != null) onImage.accept(to);
     }
 

@@ -273,6 +273,11 @@ final class LiquidGlass {
      * that depends on where it is on screen. The widgets row draws just this on every frame of a slide (GlassRow).
      */
     static void sample(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean refract) {
+        sample(canvas, rect, radius, host, p, refract, 255);
+    }
+
+    /** {@code alpha} 0 to 255: the sample drawn that see-through, for a surface that is fading in or out. */
+    static void sample(Canvas canvas, RectF rect, float radius, View host, Paints p, boolean refract, int alpha) {
         Bitmap bg = backdrop;
         if (bg != null && host != null) {
             if (p.shaderBitmap != bg) {
@@ -305,8 +310,10 @@ final class LiquidGlass {
                 r.setFloatUniform("bezel", bezel);
                 r.setFloatUniform("strength", bezel * 0.9f);
                 p.lens.setShader(r);
+                p.lens.setAlpha(alpha);
                 canvas.drawRoundRect(rect, radius, radius, p.lens);
             } else {
+                p.blur.setAlpha(alpha);
                 canvas.drawRoundRect(rect, radius, radius, p.blur);
             }
         }

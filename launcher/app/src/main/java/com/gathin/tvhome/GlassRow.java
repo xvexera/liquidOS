@@ -82,9 +82,8 @@ public class GlassRow extends LinearLayout {
             // Off screen (slid away): nothing to draw.
             if (canvas.quickReject(rect, Canvas.EdgeType.BW)) continue;
             float radius = s.card ? s.radius * scale : Math.min(rect.width(), rect.height()) / 2f;
-            int saved = alpha < 1f ? canvas.saveLayerAlpha(rect, Math.round(alpha * 255)) : -1;
-            LiquidGlass.sample(canvas, rect, radius, this, s.paints, !LiquidGlass.sliding);
-            if (saved >= 0) canvas.restoreToCount(saved);
+            // A fading card (the X, a card arriving): the sample is one shape, so its paint fades it as a buffer would.
+            LiquidGlass.sample(canvas, rect, radius, this, s.paints, !LiquidGlass.sliding, Math.round(alpha * 255));
         }
         super.dispatchDraw(canvas);
     }

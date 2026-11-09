@@ -23,6 +23,11 @@ New options in *Launcher settings > Continue watching*, above the app picker. Th
   each time; a YouTube lookup that fails is tried again after 2 minutes, then 4, up to every 2 hours, instead of
   every minute.
 - **Now playing**: the cover is kept at the size the card shows, not the size the app sends.
+- **Less graphics memory on Home, same look**: the soft band inside each app tile's glass rim is painted once and
+  shared by every tile, instead of the GPU blurring it again for each tile and each size a tile grows through.
+  Measured on an onn. 4K box: graphics memory from 55 to 40 MB and the launcher from about 120 to 106 MB, with
+  the picture on screen unchanged. A Continue watching card that fades no longer needs a buffer of its own, and
+  the wallpaper lets go of the previous picture once it has faded.
 
 ## 2026-10-29
 

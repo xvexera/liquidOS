@@ -270,6 +270,11 @@ final class GlassIcons {
      * count. The light runs round it by angle (a sweep): strongest at the top left and bottom right corners, nearly
      * gone at the other two, like light catching the edge of a glass slab. Inside it a blurred band (the thickness of
      * the glass), outside it a hairline of shade so the rim still shows over a bright wallpaper.
+     *
+     * The blurred band is painted once into a picture that every tile of that size shares. Drawn live, the GPU blurred
+     * it again for each tile and for every size a tile passes through while it grows, each time through offscreen
+     * buffers of its own that stayed in memory. The two sharp lines are still drawn live, so they stay crisp at any
+     * size.
      */
     private static final class Rim extends Drawable {
         private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -279,6 +284,10 @@ final class GlassIcons {
         private final float density;
         /** Strength: 1 is the designed look, up to about 1.7 at 100. */
         private final float k;
+        /** The blurred band for these bounds, shared between tiles. */
+        private Bitmap band;
+        private final Paint bandPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private static final Map<String, Bitmap> BANDS = new HashMap<>();
 
         Rim(float density, float strength) {
             this.density = density;
@@ -306,6 +315,37 @@ final class GlassIcons {
             line.setShader(new android.graphics.SweepGradient(b.exactCenterX(), b.exactCenterY(), scale(lit), at));
             bevel.setShader(new android.graphics.SweepGradient(b.exactCenterX(), b.exactCenterY(), scale(soft), at));
             shade.setColor(Math.min(255, Math.round(0x38 * Math.min(1.4f, k))) << 24);
+            band = band(b.width(), b.height(), scale(soft), at);
+        }
+
+        /** The band of a tile this size, painted the first time one asks. */
+        private Bitmap band(int w, int h, int[] colours, float[] at) {
+            if (w <= 0 || h <= 0) return null;
+            String key = w + "x" + h + "@" + k + "/" + density;
+            Bitmap made = BANDS.get(key);
+            if (made != null) return made;
+            // Sizes come and go with the number of columns; a handful is every size in use at once.
+            if (BANDS.size() >= 6) BANDS.clear();
+            try {
+                made = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            } catch (OutOfMemoryError e) {
+                return null;   // drawn live instead
+            }
+            android.graphics.Shader live = bevel.getShader();
+            bevel.setShader(new android.graphics.SweepGradient(w / 2f, h / 2f, colours, at));
+            RectF r = new RectF(0, 0, w, h);
+            float inset = bandInset();
+            r.inset(inset, inset);
+            float radius = Math.max(0f, AppAdapter.cornerRadius(w, density) - inset);
+            new Canvas(made).drawRoundRect(r, radius, radius, bevel);
+            bevel.setShader(live);
+            BANDS.put(key, made);
+            return made;
+        }
+
+        /** How far in from the bounds the middle of the band runs: past the shade, half the line and half its own width. */
+        private float bandInset() {
+            return shade.getStrokeWidth() + line.getStrokeWidth() / 2f + bevel.getStrokeWidth() / 2f;
         }
 
         /** The colours' alpha times the strength, capped at opaque. */
@@ -330,6 +370,10 @@ final class GlassIcons {
             rect.inset(s * 2 + t / 2f, s * 2 + t / 2f);
             float lr = Math.max(0f, r - s * 2 - t / 2f);
             canvas.drawRoundRect(rect, lr, lr, line);
+            if (band != null) {
+                canvas.drawBitmap(band, getBounds().left, getBounds().top, bandPaint);
+                return;
+            }
             float bi = bevel.getStrokeWidth() / 2f;
             rect.inset(bi, bi);
             float br = Math.max(0f, lr - bi);
