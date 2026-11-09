@@ -112,13 +112,7 @@ public final class LauncherSettingsActivity extends Activity {
                 p -> p + "%");
         choice(watching, R.string.continue_cards, 0, Extras.CONTINUE_CARDS, Extras.CONTINUE_CARDS_CHOICES,
                 Extras.continueCards(this), String::valueOf);
-        TextView watchingHint = text(getString(R.string.continue_apps_hint), 13, R.font.outfit_regular, 0x99FFFFFF);
-        watchingHint.setPadding(dp(4), 0, dp(4), dp(8));
-        watching.addView(watchingHint);
-        for (String pkg : WatchHistory.candidates(this)) {
-            toggle(watching, WatchHistory.label(this, pkg), null, WatchHistory.appOn(this, pkg),
-                    on -> Extras.setContinueApp(this, pkg, on));
-        }
+        watchingApps(watching);
 
         // Wallpaper
         LinearLayout wallpaper = section(left, R.string.section_wallpaper);
@@ -557,6 +551,117 @@ public final class LauncherSettingsActivity extends Activity {
         box.addView(bar, lp);
         panel.addView(box);
         return box;
+    }
+
+    /** One row for the apps Continue watching follows, "12 of 14"; OK opens them as a grid of pictures. */
+    private void watchingApps(LinearLayout panel) {
+        java.util.List<String> apps = WatchHistory.candidates(this);
+        TextView count = text("", 15, R.font.outfit_regular, 0xFFFFFFFF);
+        count.setTextColor(getColorStateList(R.color.pill_text_dim));
+        Runnable show = () -> {
+            int on = 0;
+            for (String pkg : apps) if (WatchHistory.appOn(this, pkg)) on++;
+            count.setText(getString(R.string.continue_apps_count, on, apps.size()) + "  \u203A");
+        };
+        show.run();
+        row(panel, getString(R.string.continue_apps), getString(R.string.continue_apps_hint), count)
+                .setOnClickListener(v -> watchingAppsGrid(apps, show));
+    }
+
+    /** The apps as tiles, five to a row: OK switches one on or off; the ones switched off are dimmed, without a tick. */
+    private void watchingAppsGrid(java.util.List<String> apps, Runnable closed) {
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Translucent_NoTitleBar);
+        android.widget.FrameLayout shade = new android.widget.FrameLayout(this);
+        shade.setBackgroundColor(0xB3000000);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(18), dp(22), dp(18));
+        // Nearly solid: the settings behind would show through a glass panel as ghost text.
+        android.graphics.drawable.GradientDrawable slab = new android.graphics.drawable.GradientDrawable();
+        slab.setColor(0xF51E1E22);
+        slab.setCornerRadius(dp(24));
+        slab.setStroke(Math.max(1, dp(1)), 0x38FFFFFF);
+        box.setBackground(slab);
+        box.addView(text(getString(R.string.widget_continue), 20, R.font.outfit_medium, 0xFFFFFFFF));
+        TextView hint = text(getString(R.string.continue_apps_hint), 13, R.font.outfit_regular, 0x99FFFFFF);
+        hint.setPadding(0, dp(4), 0, dp(12));
+        box.addView(hint);
+        android.widget.GridLayout grid = new android.widget.GridLayout(this);
+        grid.setColumnCount(Math.min(5, Math.max(1, apps.size())));
+        android.content.pm.PackageManager pm = getPackageManager();
+        for (String pkg : apps) {
+            LinearLayout cell = new LinearLayout(this);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setGravity(Gravity.CENTER_HORIZONTAL);
+            cell.setPadding(dp(8), dp(8), dp(8), dp(6));
+            cell.setBackgroundResource(R.drawable.input_row_bg);
+            cell.setFocusable(true);
+            cell.setClickable(true);
+            android.widget.FrameLayout art = new android.widget.FrameLayout(this);
+            android.widget.ImageView picture = new android.widget.ImageView(this);
+            Drawable banner = null;
+            try {
+                banner = pm.getApplicationBanner(pkg);
+                if (banner == null) {
+                    banner = pm.getApplicationIcon(pkg);
+                    picture.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                    picture.setBackgroundColor(0x33000000);
+                } else {
+                    picture.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                }
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                picture.setBackgroundColor(0x33000000);   // in the history, no longer installed
+            }
+            picture.setImageDrawable(banner);
+            picture.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override public void getOutline(View v, android.graphics.Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(9));
+                }
+            });
+            picture.setClipToOutline(true);
+            art.addView(picture, new android.widget.FrameLayout.LayoutParams(dp(124), dp(70)));
+            View tick = new View(this);
+            tick.setBackgroundResource(R.drawable.library_check);
+            android.widget.FrameLayout.LayoutParams corner = new android.widget.FrameLayout.LayoutParams(
+                    dp(20), dp(20), Gravity.TOP | Gravity.END);
+            corner.setMargins(0, dp(4), dp(4), 0);
+            art.addView(tick, corner);
+            cell.addView(art);
+            TextView name = text(WatchHistory.label(this, pkg), 13, R.font.outfit_medium, 0xFFFFFFFF);
+            name.setTextColor(getColorStateList(R.color.pill_text));
+            name.setDuplicateParentStateEnabled(true);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            name.setGravity(Gravity.CENTER);
+            name.setPadding(0, dp(5), 0, 0);
+            cell.addView(name, new LinearLayout.LayoutParams(dp(124), ViewGroup.LayoutParams.WRAP_CONTENT));
+            Runnable state = () -> {
+                boolean on = WatchHistory.appOn(this, pkg);
+                picture.setAlpha(on ? 1f : 0.3f);
+                name.setAlpha(on ? 1f : 0.55f);
+                tick.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+            };
+            state.run();
+            cell.setOnClickListener(v -> {
+                Extras.setContinueApp(this, pkg, !WatchHistory.appOn(this, pkg));
+                state.run();
+                changed();
+            });
+            grid.addView(cell);
+        }
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(grid);
+        box.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        android.widget.FrameLayout.LayoutParams centred = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        centred.setMargins(dp(40), dp(40), dp(40), dp(40));
+        shade.addView(box, centred);
+        dialog.setContentView(shade);
+        dialog.setOnDismissListener(d -> closed.run());
+        dialog.show();
+        if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
     }
 
     private void action(LinearLayout panel, String title, String hint, Runnable run) {

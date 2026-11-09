@@ -213,6 +213,8 @@
     <string name="continue_left">Quedan %1$d min</string>
     <string name="continue_remove">Quitar de Seguir viendo</string>
     <string name="widget_order">Editar orden</string>
+    <string name="continue_apps">Apps</string>
+    <string name="continue_apps_count">%1$d de %2$d</string>
     <string name="continue_apps_hint">Elige las apps cuyos videos aparecen en Seguir viendo. Las de música nunca aparecen.</string>
     <string name="continue_days">Borrar después de</string>
     <string name="continue_days_hint">Los videos que no retomes en este tiempo salen de la lista.</string>

@@ -14,6 +14,11 @@ New options in *Launcher settings > Continue watching*, above the app picker. Th
 - **Cards on Home**: 2 to 8.
 - Changes apply at once, also to the videos already on the list; the list now keeps up to 20 videos.
 
+### Continue watching apps as a grid
+- **One row instead of a long list**: *Launcher settings > Continue watching > Apps* shows how many apps are
+  followed ("5 of 6"). OK opens them as a grid of their pictures, five to a row; OK on one switches it on or
+  off. The ones switched off are dimmed and lose their tick.
+
 ### Fixes and lighter work
 - **X on a Continue watching card**: the cards left keep their glass, and focus goes to the next card instead of
   the first.

@@ -253,6 +253,8 @@
     <string name="continue_left">נותרו %1$d דק׳</string>
     <string name="continue_remove">הסרה מהמשך צפייה</string>
     <string name="widget_order">עריכת סדר</string>
+    <string name="continue_apps">Apps</string>
+    <string name="continue_apps_count">%1$d of %2$d</string>
     <string name="continue_apps_hint">בחרו את האפליקציות שהסרטונים שלהן יופיעו בהמשך צפייה. אפליקציות מוזיקה לא מופיעות.</string>
     <string name="continue_days">Delete after</string>
     <string name="continue_days_hint">Videos you have not gone back to in this time leave the list.</string>
