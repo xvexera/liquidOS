@@ -3,6 +3,17 @@
 What changed in liquidOS, newest first. For the project it grew from, see the
 [cleanyourtv releases](https://github.com/Gathin23/cleanyourtv/releases).
 
+## 2026-11-09
+
+### Continue watching settings
+New options in *Launcher settings > Continue watching*, above the app picker. The defaults keep it as before.
+- **Delete after**: videos you have not gone back to leave the list after 1, 3, 7, 14 or 30 days, or never.
+- **Shows after watching**: a video appears after 30 s, or only once you watched 5, 10, 20, 35 or 50% of it.
+- **Shortest video**: 1, 4, 10 or 20 minutes; shorter ones (music clips, shorts) stay out.
+- **Finished at**: 90, 95 or 98%; from there a video counts as finished and leaves the list.
+- **Cards on Home**: 2 to 8.
+- Changes apply at once, also to the videos already on the list; the list now keeps up to 20 videos.
+
 ## 2026-10-29
 
 ### New: Continue watching

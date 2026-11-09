@@ -45,7 +45,7 @@ with the widgets, in the order you choose. (Titles and pictures are blurred in t
 
 ### Continue watching
 - **The videos you left halfway** in your apps, as glass cards with the picture, title, a progress bar and the
-  time left. Finished videos, clips under 4 minutes, live streams without a length and music apps are left out.
+  time left. Finished videos, short clips, live streams without a length and music apps are left out.
 - **Back to the exact minute**: OK reopens the video through the app's own player while it is still open. On
   YouTube it opens the video at the minute you stopped even after the app was closed: YouTube's player does not
   say which video it is, so liquidOS finds it once by a YouTube search for the title and channel (and takes
@@ -53,6 +53,9 @@ with the widgets, in the order you choose. (Titles and pictures are blurred in t
 - **An X under each card** takes it off the list: Down from a card reaches it, so Left and Right go straight
   from card to card.
 - **Pick the apps** it follows in *Launcher settings > Continue watching*; new apps start switched on.
+- **Your rules**, in the same place: delete videos after 1 to 30 days (or never), show a video only after
+  watching part of it (30 s, or 5 to 50%), the shortest video it keeps (1 to 20 min), when a video counts as
+  finished (90, 95 or 98%) and how many cards Home shows (2 to 8). Changes apply at once, to the list too.
 - **On or off** in *Settings > Widgets*. Switching it off also deletes the list.
 - Google TV keeps its own list where only system apps can read it, so liquidOS keeps its own, from what plays
   on the TV, and only on the TV.
